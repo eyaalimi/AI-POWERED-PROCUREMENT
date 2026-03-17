@@ -2,8 +2,8 @@
 # Continuous Deployment
 #
 # Flow:
-#   push → dev branch  : auto-deploy to DEV environment
-#   push → main branch : terraform plan displayed, then MANUAL approval → deploy to PROD
+#   push → dev branch          : auto-deploy to DEV (only if AWS secrets are configured)
+#   workflow_dispatch → main   : manual trigger to deploy to PROD
 #
 # Required GitHub secrets:
 #   AWS_ACCESS_KEY_ID_DEV / AWS_SECRET_ACCESS_KEY_DEV
@@ -20,7 +20,15 @@ on:
   push:
     branches:
       - dev
-      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "prod"
+        type: choice
+        options:
+          - prod
 
 env:
   PYTHON_VERSION: "3.11"
@@ -28,7 +36,7 @@ env:
   AWS_REGION: us-east-1
 
 jobs:
-  # ── Deploy to DEV (automatic on push to dev) ──────────────────────────────
+  # ── Deploy to DEV (automatic on push to dev branch) ─────────────────────────
   deploy-dev:
     name: Deploy → DEV
     runs-on: ubuntu-latest
@@ -100,11 +108,11 @@ jobs:
           APP_ENV: dev
           LOG_LEVEL: INFO
 
-  # ── Deploy to PROD (manual approval required on push to main) ────────────
+  # ── Deploy to PROD (triggered manually via workflow_dispatch only) ──────────
   deploy-prod:
     name: Deploy → PROD
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch'
     environment: prod  # ← Requires manual approval configured in GitHub Settings → Environments
 
     steps:
