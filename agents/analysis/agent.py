@@ -115,7 +115,6 @@ def _normalize_unit(value: Optional[str]) -> Optional[str]:
         "unite": "units",
         "unites": "units",
         "unité": "units",
-        "unites": "units",
         "boite": "boxes",
         "boites": "boxes",
         "boîte": "boxes",
@@ -370,7 +369,7 @@ if __name__ == "__main__":
             print(f"[ACK] Failed to send acknowledgment email: {exc}")
 
         if spec.is_valid:
-            print(f"\n✅  Demande valide !")
+            print("\n✅  Demande valide !")
             print(f"    Produit   : {spec.product}")
             print(f"    Catégorie : {spec.category}")
             print(f"    Quantité  : {spec.quantity} {spec.unit or ''}")
@@ -405,14 +404,14 @@ if __name__ == "__main__":
         return len(ids)
 
     # ── Main loop ─────────────────────────────────────────────────
-    print(f"\n🚀  Analysis Agent — mode surveillance active")
+    print("\n🚀  Analysis Agent — mode surveillance active")
     print(f"    Boîte    : {settings.gmail_address}")
     print(f"    Intervalle: toutes les {POLL_INTERVAL} secondes")
-    print(f"    Arrêt    : Ctrl+C\n")
+    print("    Arrêt    : Ctrl+C\n")
 
     conn = imaplib.IMAP4_SSL(settings.imap_host, settings.imap_port)
     conn.login(settings.gmail_address, _password)
-    print(f"✅  Connecté à Gmail — surveillance en cours...\n")
+    print("✅  Connecté à Gmail — surveillance en cours...\n")
 
     try:
         while True:

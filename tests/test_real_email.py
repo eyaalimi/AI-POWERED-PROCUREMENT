@@ -56,7 +56,7 @@ def fetch_latest_unseen() -> tuple[str, str] | None:
     parser = EmailParser()
     parsed = parser.parse(raw)
 
-    print(f"\n📧 Email received:")
+    print("\n📧 Email received:")
     print(f"   From    : {parsed.from_email}")
     print(f"   Subject : {parsed.subject}")
     print(f"   Body    :\n{'-'*50}")

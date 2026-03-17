@@ -55,7 +55,7 @@ def run_pipeline():
     spec = agent1.analyze(TEST_EMAIL, REQUESTER_EMAIL)
     spec_dict = asdict(spec)
 
-    print(f"✅  Résultat Agent 1 :")
+    print("✅  Résultat Agent 1 :")
     print(f"    Produit   : {spec.product}")
     print(f"    Catégorie : {spec.category}")
     print(f"    Quantité  : {spec.quantity} {spec.unit or ''}")

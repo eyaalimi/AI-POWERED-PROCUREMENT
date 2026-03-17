@@ -3,7 +3,6 @@ email_gateway/router.py
 Classify incoming EmailEvent as requester request or supplier response,
 then forward to the orchestrator entry point.
 """
-import re
 from email_gateway.poller import EmailEvent, set_email_handler
 from logger import get_logger
 

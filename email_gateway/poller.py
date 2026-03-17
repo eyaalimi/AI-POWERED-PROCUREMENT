@@ -4,7 +4,6 @@ IMAP inbox poller — checks Gmail every N seconds using APScheduler.
 Forwards structured EmailEvent objects to the orchestrator router.
 """
 import imaplib
-import email
 from dataclasses import dataclass
 from apscheduler.schedulers.background import BackgroundScheduler
 
