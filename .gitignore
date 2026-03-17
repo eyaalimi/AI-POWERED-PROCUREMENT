@@ -33,3 +33,6 @@ dist/
 
 # Generated agent outputs (runtime artifacts)
 outputs/
+
+# Terraform — kept locally, not pushed to GitHub yet
+terraform/
