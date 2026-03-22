@@ -204,19 +204,19 @@ class TestBudgetFit:
 class TestRecommendation:
 
     def test_rank_1_best_value(self):
-        score = MagicMock(price_score=95, delivery_score=95)
+        score = MagicMock(cout_score=95, delais_score=95, qualite_score=70, performance_score=70)
         rec = _generate_recommendation(score, 1, 3)
-        assert "Best overall value" in rec
+        assert "Meilleure offre globale" in rec
 
     def test_last_rank(self):
-        score = MagicMock(price_score=50, delivery_score=50)
+        score = MagicMock(cout_score=50, delais_score=50, qualite_score=50, performance_score=50)
         rec = _generate_recommendation(score, 3, 3)
-        assert "Least competitive" in rec
+        assert "moins compétitive" in rec
 
     def test_middle_rank_with_strengths(self):
-        score = MagicMock(price_score=85, delivery_score=85, warranty_score=60)
+        score = MagicMock(cout_score=85, delais_score=85, qualite_score=60, performance_score=60)
         rec = _generate_recommendation(score, 2, 3)
-        assert "Good option" in rec
+        assert "Bonne option" in rec
 
 
 # ── EvaluationAgent.evaluate() ──────────────────────────────────────────────
