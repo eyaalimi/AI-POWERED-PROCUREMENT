@@ -11,7 +11,6 @@ Usage:
 """
 import argparse
 import imaplib
-import os
 import sys
 import time
 from dataclasses import asdict
@@ -243,7 +242,7 @@ def _wait_and_recheck_offers(imap_conn, initial_result, spec, requester, attachm
                         if req:
                             req.status = "completed"
                             session.commit()
-                            print(f"  [DB] Request status updated to 'completed'")
+                            print("  [DB] Request status updated to 'completed'")
                 except Exception as e:
                     print(f"  [DB] Warning: could not persist B2 results: {e}")
 
@@ -296,7 +295,7 @@ def process_email(raw_bytes: bytes, analysis_agent: AnalysisAgent, imap_conn=Non
     spec = analysis_agent.analyze(parsed.body, parsed.from_email, attachment_text=attachment_text)
 
     if spec.is_valid:
-        print(f"  Valid request!")
+        print("  Valid request!")
         print(f"    Product  : {spec.product}")
         print(f"    Category : {spec.category}")
         print(f"    Quantity : {spec.quantity} {spec.unit or ''}")
@@ -411,7 +410,7 @@ def process_email(raw_bytes: bytes, analysis_agent: AnalysisAgent, imap_conn=Non
             if relaunch_count >= MAX_RELAUNCHES:
                 print(f"\n  Max relaunches reached ({MAX_RELAUNCHES}) — pipeline complete.")
                 break
-            print(f"\n  Decision: RELAUNCH — searching for new suppliers...")
+            print("\n  Decision: RELAUNCH — searching for new suppliers...")
             excluded_suppliers.append(result.best_offer)
             continue
         else:  # timeout — requester is satisfied or didn't reply

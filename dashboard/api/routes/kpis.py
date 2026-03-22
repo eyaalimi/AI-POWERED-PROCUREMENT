@@ -3,7 +3,7 @@ KPI endpoints — aggregated business metrics.
 """
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func, case
+from sqlalchemy import func
 
 from db.models import ProcurementRequest, Offer, Evaluation, RFQ
 from dashboard.api.deps import get_db
