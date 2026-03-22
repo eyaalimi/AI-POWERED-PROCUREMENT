@@ -79,18 +79,21 @@ You have 5 agent-tools available. Execute them in this order:
 
 1. **analyze_request** — Call FIRST with the email body and sender email.
    - If the result has is_valid=false, STOP and report the rejection reason.
+   - SKIP this step if a validated procurement spec is already provided in the prompt.
 
-2. **source_suppliers** — Call with the procurement spec JSON from step 1.
+2. **source_suppliers** — Call with the procurement spec JSON (from step 1 or provided directly).
    - If the suppliers array is empty, STOP and report that no suppliers were found.
+   - If excluded_suppliers are listed in the prompt, remove them from the result before proceeding.
 
 3. **send_rfqs_and_collect_offers** — Call with the spec and supplier list JSONs.
    - This sends RFQ emails and checks for immediate supplier responses.
 
 4. **store_pipeline_data** — Call with spec, suppliers, and communication result JSONs.
    - This persists all data to the database.
+   - IMPORTANT: Extract the request_id from the result — you need it for step 5.
 
 5. **evaluate_offers** — Call ONLY if there are offers in the communication result.
-   - Pass the spec and the offers array JSON.
+   - Pass the spec JSON, offers array JSON, AND the request_id from step 4.
    - If no offers were received, skip this step and report "awaiting_responses".
 
 After all steps, return a final JSON summary:
@@ -107,7 +110,8 @@ After all steps, return a final JSON summary:
 }
 
 Rules:
-- Always follow the order: analyze → source → communicate → store → evaluate.
+- If a spec is already provided, start directly with source_suppliers — do NOT re-analyze.
+- If excluded_suppliers are provided, filter them out from the sourced supplier list before sending RFQs.
 - Pass the EXACT JSON strings between tools — do not modify or summarize them.
 - If any tool fails or throws an error, stop and report status="failed" with the error.
 - Return ONLY the final JSON summary, no extra text.
@@ -140,20 +144,57 @@ class Orchestrator:
             ],
         )
 
-    def run(self, email_body: str, requester_email: str) -> PipelineResult:
+    def run(
+        self, email_body: str, requester_email: str,
+        procurement_spec: dict = None, attachment_text: str = "",
+        excluded_suppliers: list = None,
+    ) -> PipelineResult:
         """
         Execute the full procurement pipeline.
 
-        The orchestrator LLM will call each agent-tool in sequence,
-        passing data between them and making decisions at each step.
+        Args:
+            email_body: raw email text
+            requester_email: sender email
+            procurement_spec: if provided, skip analysis and use this spec directly
+            attachment_text: extracted text from email attachments (PDF, Excel, etc.)
+            excluded_suppliers: supplier names to exclude (from previous relaunch rounds)
         """
         timestamp = datetime.now(timezone.utc).isoformat()
+        excluded = excluded_suppliers or []
 
         logger.info("Orchestrator pipeline started", extra={
             "requester": requester_email,
+            "excluded_suppliers": excluded,
         })
 
-        prompt = f"""
+        excluded_section = ""
+        if excluded:
+            excluded_section = f"""
+EXCLUDED SUPPLIERS (from previous rounds — do NOT include these in the supplier list):
+{json.dumps(excluded, ensure_ascii=False)}
+"""
+
+        if procurement_spec:
+            # Spec already computed by run_pipeline.py — skip analysis, start from sourcing
+            spec_json = json.dumps(procurement_spec, ensure_ascii=False, default=str)
+            prompt = f"""
+The procurement request has already been analyzed. Here is the validated spec:
+
+{spec_json}
+{excluded_section}
+Skip analyze_request — start directly with source_suppliers using the spec above.
+Then continue with the remaining pipeline steps (communicate → store → evaluate).
+"""
+        else:
+            attachment_section = ""
+            if attachment_text and attachment_text.strip():
+                attachment_section = f"""
+Attachment content (extracted from PDF/Excel):
+---
+{attachment_text.strip()[:3000]}
+---
+"""
+            prompt = f"""
 Process this procurement request:
 
 Requester email: {requester_email}
@@ -162,8 +203,9 @@ Email body:
 ---
 {email_body}
 ---
-
+{attachment_section}
 Execute the full procurement pipeline using the available tools.
+When calling analyze_request, pass the attachment_text parameter if attachment content is provided above.
 """
 
         try:

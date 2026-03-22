@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from db.models import (
-    ProcurementRequest, Supplier, RFQ, Offer,
+    ProcurementRequest, Supplier, RFQ, Offer, Evaluation,
     get_engine, get_session_factory, create_tables,
 )
 from logger import get_logger
@@ -201,6 +201,54 @@ class StorageTools:
         except Exception as exc:
             session.rollback()
             logger.error("Failed to store offers", extra={"error": str(exc)})
+            raise
+        finally:
+            session.close()
+
+    # ── Evaluations ────────────────────────────────────────────────────────
+
+    def store_evaluations(self, request_id: str, evaluation_scores: list, report_path: str = None) -> list:
+        """
+        Store QCDP evaluation scores from Agent 5.
+        Returns list of (supplier_name, evaluation_db_id) tuples.
+        """
+        session = self._session()
+        try:
+            req_uuid = uuid.UUID(request_id)
+            result = []
+            for s in evaluation_scores:
+                eval_record = Evaluation(
+                    request_id=req_uuid,
+                    offer_id=None,
+                    supplier_name=s.get("supplier_name", ""),
+                    supplier_email=s.get("supplier_email", ""),
+                    price_score=s.get("price_score"),
+                    delivery_score=s.get("delivery_score"),
+                    warranty_score=s.get("warranty_score"),
+                    payment_score=s.get("payment_score"),
+                    budget_fit_score=s.get("budget_fit_score"),
+                    rse_score=s.get("rse_score"),
+                    qualite_score=s.get("qualite_score"),
+                    cout_score=s.get("cout_score"),
+                    delais_score=s.get("delais_score"),
+                    performance_score=s.get("performance_score"),
+                    overall_score=s.get("overall_score"),
+                    rank=s.get("rank"),
+                    recommendation=s.get("recommendation"),
+                    report_path=report_path,
+                )
+                session.add(eval_record)
+                session.flush()
+                result.append((s.get("supplier_name", ""), str(eval_record.id)))
+
+            session.commit()
+            logger.info("Stored evaluations", extra={
+                "request_id": request_id, "count": len(result),
+            })
+            return result
+        except Exception as exc:
+            session.rollback()
+            logger.error("Failed to store evaluations", extra={"error": str(exc)})
             raise
         finally:
             session.close()

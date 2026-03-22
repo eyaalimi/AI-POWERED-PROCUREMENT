@@ -18,6 +18,9 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
+# ── Dry-run mode (set via run_pipeline.py --dry-run) ─────────────────────────
+DRY_RUN = False
+
 # Reuse scraping logic from sourcing agent
 from agents.agent_sourcing.tools import _scrape_email_from_url, _CONTACT_PATHS
 
@@ -44,6 +47,16 @@ def send_email_to_supplier(
         JSON with keys: status ("sent" | "failed"), message_id, error.
     """
     logger.info("Sending email to supplier", extra={"supplier": supplier_name, "to": to_email})
+
+    if DRY_RUN:
+        logger.info("[DRY-RUN] Skipping real email send", extra={"supplier": supplier_name, "to": to_email})
+        print(f"  [DRY-RUN] Would send RFQ to {supplier_name} <{to_email}>")
+        print(f"            Subject: {subject}")
+        return json.dumps({
+            "status": "sent",
+            "message_id": f"dry-run-{supplier_name}",
+            "error": None,
+        })
 
     try:
         sender = EmailSender()
@@ -116,6 +129,104 @@ def fetch_supplier_replies(rfq_subject_prefix: str) -> str:
         from_email, subject, body, received_at.
         Returns empty array if no replies found or IMAP fails.
     """
+    if DRY_RUN:
+        logger.info("[DRY-RUN] Returning simulated supplier replies")
+        print(f"  [DRY-RUN] Simulating 5 supplier replies for: {rfq_subject_prefix}")
+        fake_replies = [
+            {
+                "from_email": "ventes@techsouris.tn",
+                "subject": f"Re: {rfq_subject_prefix}",
+                "body": (
+                    "Bonjour,\n\n"
+                    "Suite à votre demande de devis pour des souris informatiques, "
+                    "veuillez trouver notre offre ci-dessous :\n"
+                    "- Produit : Souris sans fil Logitech M185\n"
+                    "- Prix unitaire : 45 TND HT\n"
+                    "- Délai de livraison : 5 jours ouvrables\n"
+                    "- Garantie : 2 ans constructeur\n"
+                    "- Conditions de paiement : Net 30 jours\n"
+                    "- Livraison gratuite à partir de 50 unités\n"
+                    "- Certification CE, conformité RSE\n\n"
+                    "Cordialement,\nKarim Ben Salah\nTechSouris SARL"
+                ),
+                "has_pdf": False,
+                "received_at": datetime.now(timezone.utc).isoformat(),
+            },
+            {
+                "from_email": "commercial@peripheriques-pro.tn",
+                "subject": f"Re: {rfq_subject_prefix}",
+                "body": (
+                    "Madame, Monsieur,\n\n"
+                    "Nous avons le plaisir de vous soumettre notre proposition :\n"
+                    "- Produit : Souris filaire HP 125\n"
+                    "- Prix unitaire : 28 TND HT\n"
+                    "- Délai de livraison : 3 jours ouvrables\n"
+                    "- Garantie : 1 an\n"
+                    "- Conditions de paiement : 50% à la commande, solde à la livraison\n"
+                    "- Stock disponible : 500 unités\n"
+                    "- Pas de certification RSE\n\n"
+                    "Restant à votre disposition,\nSonia Maalej\nPériphériques Pro"
+                ),
+                "has_pdf": False,
+                "received_at": datetime.now(timezone.utc).isoformat(),
+            },
+            {
+                "from_email": "info@bureautique-express.tn",
+                "subject": f"Re: {rfq_subject_prefix}",
+                "body": (
+                    "Bonjour,\n\n"
+                    "En réponse à votre appel d'offres, voici notre meilleure proposition :\n"
+                    "- Produit : Souris ergonomique Microsoft Ergonomic Mouse\n"
+                    "- Prix unitaire : 89 TND HT\n"
+                    "- Délai de livraison : 10 jours ouvrables\n"
+                    "- Garantie : 3 ans\n"
+                    "- Conditions de paiement : Net 45 jours\n"
+                    "- Design ergonomique certifié, réduit les TMS\n"
+                    "- Certification RSE et emballage recyclable\n\n"
+                    "Bien cordialement,\nAhmed Trabelsi\nBureautique Express"
+                ),
+                "has_pdf": False,
+                "received_at": datetime.now(timezone.utc).isoformat(),
+            },
+            {
+                "from_email": "devis@clickmania.tn",
+                "subject": f"Re: {rfq_subject_prefix}",
+                "body": (
+                    "Hello,\n\n"
+                    "Thank you for your RFQ. Please find our quotation:\n"
+                    "- Product: Souris gaming Razer DeathAdder V3\n"
+                    "- Unit price: 135 TND excl. tax\n"
+                    "- Delivery: 7 business days\n"
+                    "- Warranty: 2 years\n"
+                    "- Payment terms: Net 30 days\n"
+                    "- RGB lighting, 30K DPI sensor\n"
+                    "- No RSE certification\n\n"
+                    "Best regards,\nMehdi Gharbi\nClickMania Distribution"
+                ),
+                "has_pdf": False,
+                "received_at": datetime.now(timezone.utc).isoformat(),
+            },
+            {
+                "from_email": "contact@fournitures-sahara.tn",
+                "subject": f"Re: {rfq_subject_prefix}",
+                "body": (
+                    "Bonjour,\n\n"
+                    "Nous vous remercions pour votre consultation. Notre offre :\n"
+                    "- Produit : Souris sans fil Dell MS3320W\n"
+                    "- Prix unitaire : 62 TND HT\n"
+                    "- Délai de livraison : 14 jours\n"
+                    "- Garantie : 2 ans\n"
+                    "- Conditions de paiement : Net 60 jours\n"
+                    "- Double connectivité Bluetooth + USB\n"
+                    "- Fournisseur certifié ISO 14001 (RSE)\n\n"
+                    "Cordialement,\nFatma Bouazizi\nFournitures Sahara"
+                ),
+                "has_pdf": False,
+                "received_at": datetime.now(timezone.utc).isoformat(),
+            },
+        ]
+        return json.dumps(fake_replies, ensure_ascii=False)
+
     if not settings.gmail_address or not settings.gmail_app_password:
         logger.warning("Gmail credentials not configured — cannot check inbox")
         return json.dumps([])

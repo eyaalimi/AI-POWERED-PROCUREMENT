@@ -134,7 +134,7 @@ class AnalysisAgent:
             ],
         )
 
-    def analyze(self, email_body: str, requester_email: str) -> ProcurementSpec:
+    def analyze(self, email_body: str, requester_email: str, attachment_text: str = "") -> ProcurementSpec:
         logger.info("Analysis Agent invoked", extra={"requester": requester_email})
 
         from utils.sanitizer import sanitize_email_input, detect_injection
@@ -163,6 +163,16 @@ class AnalysisAgent:
         from datetime import date
         today = date.today().isoformat()
 
+        attachment_section = ""
+        if attachment_text and attachment_text.strip():
+            attachment_section = f"""
+
+Attached document content (PDF/Excel extracted text):
+---
+{attachment_text.strip()[:3000]}
+---
+"""
+
         prompt = f"""
 Today's date: {today}
 
@@ -172,8 +182,10 @@ Email body:
 ---
 {clean_body}
 ---
-
-Extract the procurement information and return JSON.
+{attachment_section}
+Extract the procurement information from the email body AND any attached document content.
+The attachment may contain the actual procurement details (product specs, quantities, budget, etc.).
+Return JSON.
 When extracting the deadline:
 - Convert any natural language date to ISO format YYYY-MM-DD (e.g. "31 mars 2026" → "2026-03-31", "end of this month" → last day of current month based on today's date above, "next week" → 7 days from today).
 - If no deadline is mentioned, set deadline to null.

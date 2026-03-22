@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     # ── Database ───────────────────────────────────────────────────
     database_url: str = Field(
-        default="postgresql://procurement:devpassword@localhost:5432/procurement_db"
+        default="postgresql://procurement:devpassword@localhost:5433/procurement_db"
     )
 
     # ── Gmail SMTP / IMAP ──────────────────────────────────────────

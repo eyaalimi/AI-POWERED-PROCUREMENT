@@ -118,20 +118,20 @@ def _generate_with_reportlab(
         elements.append(Paragraph(" | ".join(info_parts), styles["Normal"]))
     elements.append(Spacer(1, 6 * mm))
 
-    # ── Comparison table ─────────────────────────────────────────────────────
+    # ── QCDP Comparison table ────────────────────────────────────────────────
     header = [
         "Rank",
         "Supplier",
+        "Email",
         "Unit Price",
         "Total Price",
         "Delivery\n(days)",
         "Warranty",
         "Payment\nTerms",
-        "Price\nScore",
-        "Delivery\nScore",
-        "Warranty\nScore",
-        "Payment\nScore",
-        "Budget\nFit",
+        "Q\nQualité",
+        "C\nCoût",
+        "D\nDélais",
+        "P\nPerf/RSE",
         "Overall\nScore",
     ]
 
@@ -140,21 +140,21 @@ def _generate_with_reportlab(
         row = [
             str(s.rank),
             s.supplier_name,
+            getattr(s, "supplier_email", "") or "N/A",
             _fmt(s.unit_price),
             _fmt(s.total_price),
             _fmt(s.delivery_days),
             s.warranty or "N/A",
             s.payment_terms or "N/A",
-            f"{s.price_score:.1f}",
-            f"{s.delivery_score:.1f}",
-            f"{s.warranty_score:.1f}",
-            f"{s.payment_score:.1f}",
-            f"{s.budget_fit_score:.1f}",
+            f"{getattr(s, 'qualite_score', 0):.1f}",
+            f"{getattr(s, 'cout_score', 0):.1f}",
+            f"{getattr(s, 'delais_score', 0):.1f}",
+            f"{getattr(s, 'performance_score', 0):.1f}",
             f"{s.overall_score:.1f}",
         ]
         data.append(row)
 
-    col_widths = [30, 90, 60, 65, 45, 55, 55, 40, 45, 45, 45, 40, 45]
+    col_widths = [25, 80, 95, 50, 55, 40, 55, 55, 40, 40, 40, 45, 45]
     table = Table(data, colWidths=col_widths, repeatRows=1)
 
     style_cmds = [
@@ -183,6 +183,15 @@ def _generate_with_reportlab(
     table.setStyle(TableStyle(style_cmds))
     elements.append(table)
     elements.append(Spacer(1, 6 * mm))
+
+    # ── QCDP Weights legend ──────────────────────────────────────────────────
+    elements.append(
+        Paragraph(
+            "QCDP Weights: Qualité 25% | Coût 35% | Délais 20% | Performance/RSE 20%",
+            styles["Normal"],
+        )
+    )
+    elements.append(Spacer(1, 4 * mm))
 
     # ── Recommendations ──────────────────────────────────────────────────────
     elements.append(Paragraph("Recommendations", styles["Heading2"]))
@@ -233,14 +242,16 @@ def _generate_text_report(
     for s in scores:
         lines.extend([
             f"Rank #{s.rank}: {s.supplier_name}",
+            f"  Email        : {getattr(s, 'supplier_email', '') or 'N/A'}",
             f"  Unit Price   : {_fmt(s.unit_price)}",
             f"  Total Price  : {_fmt(s.total_price)} {s.currency}",
             f"  Delivery     : {_fmt(s.delivery_days)} days",
             f"  Warranty     : {s.warranty or 'N/A'}",
             f"  Payment Terms: {s.payment_terms or 'N/A'}",
-            f"  Scores → Price: {s.price_score:.1f}  Delivery: {s.delivery_score:.1f}"
-            f"  Warranty: {s.warranty_score:.1f}  Payment: {s.payment_score:.1f}"
-            f"  Budget Fit: {s.budget_fit_score:.1f}",
+            f"  QCDP → Q(Qualité): {getattr(s, 'qualite_score', 0):.1f}"
+            f"  C(Coût): {getattr(s, 'cout_score', 0):.1f}"
+            f"  D(Délais): {getattr(s, 'delais_score', 0):.1f}"
+            f"  P(Perf/RSE): {getattr(s, 'performance_score', 0):.1f}",
             f"  Overall Score: {s.overall_score:.1f} / 100",
             f"  Recommendation: {s.recommendation}",
             "-" * 70,

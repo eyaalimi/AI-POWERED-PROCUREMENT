@@ -1,15 +1,14 @@
 """
 agents/agent_evaluation/agent.py
-Evaluation Agent — scores supplier offers on multiple criteria and ranks them.
+Evaluation Agent — scores supplier offers using the QCDP matrix and ranks them.
 
 No LLM needed — pure algorithmic scoring.
 
-Criteria & weights:
-  - Price          : 35%  (lower is better)
-  - Delivery time  : 25%  (faster is better)
-  - Warranty       : 15%  (longer is better)
-  - Payment terms  : 10%  (longer net days is better)
-  - Budget fit     : 15%  (within budget gets full score)
+QCDP Matrix:
+  - Qualité (Q)      : 25%  — warranty duration + quality signals
+  - Coût (C)         : 35%  — price competitiveness + budget fit
+  - Délais (D)       : 20%  — delivery speed
+  - Performance (P)  : 20%  — payment terms + RSE/local bonus
 
 Input  : list of SupplierOffer dicts + ProcurementSpec dict
 Output : EvaluationResult with ranked OfferScores + PDF report path
@@ -29,14 +28,13 @@ from logger import get_logger
 
 logger = get_logger(__name__)
 
-# ── Weights ──────────────────────────────────────────────────────────────────
+# ── QCDP Weights ─────────────────────────────────────────────────────────────
 
-WEIGHTS = {
-    "price": 0.35,
-    "delivery": 0.25,
-    "warranty": 0.15,
-    "payment": 0.10,
-    "budget_fit": 0.15,
+QCDP_WEIGHTS = {
+    "qualite": 0.25,      # Q — warranty + quality signals
+    "cout": 0.35,         # C — price competitiveness + budget fit
+    "delais": 0.20,       # D — delivery speed
+    "performance": 0.20,  # P — payment terms + RSE/local bonus
 }
 
 
@@ -44,7 +42,7 @@ WEIGHTS = {
 
 @dataclass
 class OfferScore:
-    """Detailed score breakdown for one supplier offer."""
+    """Detailed score breakdown for one supplier offer (QCDP matrix)."""
     supplier_name: str
     supplier_email: str
     unit_price: Optional[float]
@@ -53,12 +51,18 @@ class OfferScore:
     delivery_days: Optional[int]
     warranty: Optional[str]
     payment_terms: Optional[str]
-    # Scores (0–100)
+    # QCDP sub-scores (0–100)
     price_score: float
     delivery_score: float
     warranty_score: float
     payment_score: float
     budget_fit_score: float
+    rse_score: float
+    # QCDP axis scores (0–100)
+    qualite_score: float
+    cout_score: float
+    delais_score: float
+    performance_score: float
     overall_score: float
     rank: int
     recommendation: str
@@ -147,6 +151,43 @@ def _score_payment(terms_list: list[Optional[str]], idx: int) -> float:
     return round((days[idx] / max_days) * 100, 1)
 
 
+def _score_rse(offer: dict) -> float:
+    """Score RSE / local performance signals (0–100).
+
+    Heuristics:
+      - Tunisian supplier (.tn email/website or country=Tunisia) → +40
+      - Certifications mentioned (ISO, CE, NF, etc.) → +30
+      - Warranty present → +15
+      - Notes mentioning eco/RSE keywords → +15
+    """
+    score = 0.0
+    country = (offer.get("country") or "").lower()
+    email = (offer.get("supplier_email") or "").lower()
+    website = (offer.get("website") or offer.get("source_url") or "").lower()
+    notes = (offer.get("notes") or "").lower()
+    warranty = offer.get("warranty") or ""
+
+    # Local / Tunisian bonus
+    if "tunis" in country or email.endswith(".tn") or ".tn" in website:
+        score += 40
+
+    # Certifications
+    cert_keywords = ["iso", "ce ", "nf ", "certification", "certifié", "certified", "haccp"]
+    if any(k in notes for k in cert_keywords):
+        score += 30
+
+    # Warranty presence
+    if warranty.strip():
+        score += 15
+
+    # Eco / RSE keywords
+    rse_keywords = ["rse", "éco", "eco", "durable", "sustainable", "environnement", "green"]
+    if any(k in notes for k in rse_keywords):
+        score += 15
+
+    return min(score, 100.0)
+
+
 def _score_budget_fit(total_price: Optional[float], budget_max: Optional[float]) -> float:
     """Score based on how well the price fits within budget."""
     if total_price is None or budget_max is None or budget_max <= 0:
@@ -162,27 +203,31 @@ def _score_budget_fit(total_price: Optional[float], budget_max: Optional[float])
 
 
 def _generate_recommendation(score: "OfferScore", rank: int, total: int) -> str:
-    """Generate a text recommendation for an offer."""
+    """Generate a text recommendation based on QCDP axes."""
     if rank == 1:
-        parts = ["Best overall value"]
-        if score.price_score >= 90:
-            parts.append("lowest price")
-        if score.delivery_score >= 90:
-            parts.append("fastest delivery")
+        parts = ["Meilleure offre globale"]
+        if score.cout_score >= 90:
+            parts.append("meilleur coût")
+        if score.delais_score >= 90:
+            parts.append("délais les plus courts")
+        if score.qualite_score >= 90:
+            parts.append("qualité supérieure")
         return " — ".join(parts)
     elif rank == total:
-        return "Least competitive offer"
+        return "Offre la moins compétitive"
     else:
         strengths = []
-        if score.price_score >= 80:
-            strengths.append("competitive price")
-        if score.delivery_score >= 80:
-            strengths.append("fast delivery")
-        if score.warranty_score >= 80:
-            strengths.append("strong warranty")
+        if score.cout_score >= 80:
+            strengths.append("coût compétitif")
+        if score.delais_score >= 80:
+            strengths.append("bons délais")
+        if score.qualite_score >= 80:
+            strengths.append("bonne qualité")
+        if score.performance_score >= 80:
+            strengths.append("bonne performance/RSE")
         if strengths:
-            return "Good option — " + ", ".join(strengths)
-        return "Average offer"
+            return "Bonne option — " + ", ".join(strengths)
+        return "Offre moyenne"
 
 
 # ── Agent class ──────────────────────────────────────────────────────────────
@@ -240,7 +285,7 @@ class EvaluationAgent:
         warranties = [o.get("warranty") for o in offer_dicts]
         payment_terms = [o.get("payment_terms") for o in offer_dicts]
 
-        # Score each offer
+        # Score each offer using QCDP matrix
         scored = []
         for i, o in enumerate(offer_dicts):
             ps = _score_price(prices, i)
@@ -248,13 +293,19 @@ class EvaluationAgent:
             ws = _score_warranty(warranties, i)
             pts = _score_payment(payment_terms, i)
             bfs = _score_budget_fit(o.get("total_price"), budget_max)
+            rse = _score_rse(o)
+
+            # QCDP axis scores
+            qualite = round(ws, 1)                                    # Q: warranty/quality
+            cout = round(ps * 0.65 + bfs * 0.35, 1)                  # C: price + budget fit
+            delais = round(ds, 1)                                     # D: delivery
+            performance = round(pts * 0.50 + rse * 0.50, 1)          # P: payment + RSE
 
             overall = round(
-                ps * WEIGHTS["price"]
-                + ds * WEIGHTS["delivery"]
-                + ws * WEIGHTS["warranty"]
-                + pts * WEIGHTS["payment"]
-                + bfs * WEIGHTS["budget_fit"],
+                qualite * QCDP_WEIGHTS["qualite"]
+                + cout * QCDP_WEIGHTS["cout"]
+                + delais * QCDP_WEIGHTS["delais"]
+                + performance * QCDP_WEIGHTS["performance"],
                 1,
             )
 
@@ -272,6 +323,11 @@ class EvaluationAgent:
                 warranty_score=ws,
                 payment_score=pts,
                 budget_fit_score=bfs,
+                rse_score=rse,
+                qualite_score=qualite,
+                cout_score=cout,
+                delais_score=delais,
+                performance_score=performance,
                 overall_score=overall,
                 rank=0,
                 recommendation="",

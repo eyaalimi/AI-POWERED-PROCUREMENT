@@ -30,7 +30,8 @@ class StorageResult:
     suppliers_stored: int
     rfqs_stored: int
     offers_stored: int
-    status: str
+    evaluations_stored: int = 0
+    status: str = "pending"
 
 
 class StorageAgent:
@@ -122,6 +123,17 @@ class StorageAgent:
         self._tools.update_request_status(request_id, "offers_received")
         return stored
 
+    # ── Stage 5: Store evaluations (Agent 5 output) ─────────────────────
+
+    def store_evaluations(self, request_id: str, evaluation_scores: list, report_path: str = None) -> list:
+        """
+        Store QCDP evaluation scores from Agent 5.
+        Returns list of (supplier_name, evaluation_db_id) tuples.
+        """
+        stored = self._tools.store_evaluations(request_id, evaluation_scores, report_path)
+        self._tools.update_request_status(request_id, "evaluated")
+        return stored
+
     # ── Full pipeline store ─────────────────────────────────────────────
 
     def store_full_pipeline(
@@ -148,6 +160,7 @@ class StorageAgent:
             suppliers_stored=len(supplier_map),
             rfqs_stored=len(rfq_map),
             offers_stored=len(stored_offers),
+            evaluations_stored=0,
             status="offers_received",
         )
 

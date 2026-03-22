@@ -110,16 +110,68 @@ class Evaluation(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     request_id = Column(UUID(as_uuid=True), ForeignKey("procurement_requests.id"), nullable=False)
-    offer_id = Column(UUID(as_uuid=True), ForeignKey("offers.id"), nullable=False)
+    offer_id = Column(UUID(as_uuid=True), ForeignKey("offers.id"), nullable=True)
+    supplier_name = Column(String(255))
+    supplier_email = Column(String(255))
     price_score = Column(Float)
     delivery_score = Column(Float)
     warranty_score = Column(Float)
+    payment_score = Column(Float)
+    budget_fit_score = Column(Float)
+    rse_score = Column(Float)
+    qualite_score = Column(Float)
+    cout_score = Column(Float)
+    delais_score = Column(Float)
+    performance_score = Column(Float)
     overall_score = Column(Float)
     rank = Column(Integer)
     recommendation = Column(Text)
+    report_path = Column(Text)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     request = relationship("ProcurementRequest", back_populates="evaluations")
     offer = relationship("Offer", back_populates="evaluation")
+
+
+class SourcingAuditLog(Base):
+    __tablename__ = "sourcing_audit_log"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id = Column(UUID(as_uuid=True), ForeignKey("procurement_requests.id"), nullable=True)
+    supplier_name = Column(String(255), nullable=False)
+    supplier_email = Column(String(255))
+    supplier_website = Column(Text)
+    source = Column(String(50))  # 'internal_db' or 'web_search'
+    action = Column(String(50), nullable=False)  # 'retained', 'excluded', 'no_email', 'duplicate'
+    reason = Column(Text)
+    relevance_score = Column(Float)
+    search_query = Column(Text)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+
+
+class SupplierBlacklist(Base):
+    __tablename__ = "supplier_blacklist"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    supplier_name = Column(String(255), nullable=False)
+    supplier_email = Column(String(255))
+    reason = Column(Text, nullable=False)
+    blacklisted_by = Column(String(255), default="admin")
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+
+
+class PipelineEvent(Base):
+    __tablename__ = "pipeline_events"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id = Column(UUID(as_uuid=True), ForeignKey("procurement_requests.id"), nullable=True)
+    agent = Column(String(100), nullable=False)
+    event_type = Column(String(50), nullable=False)  # 'info', 'warning', 'error', 'success'
+    message = Column(Text, nullable=False)
+    details = Column(Text)  # JSON extra data
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+
+    request = relationship("ProcurementRequest", backref="events")
 
 
 # ── Engine & Session ─────────────────────────────────────────────────────────

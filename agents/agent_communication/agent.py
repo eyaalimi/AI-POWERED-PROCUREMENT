@@ -53,7 +53,7 @@ For each supplier in the list:
    - Desired delivery deadline
    - A request for: unit price, total price, delivery time, warranty, payment terms
    - Mention that this is a competitive procurement process
-   - A professional closing with the requester's organization name (inferred from requester_email domain)
+   - A professional closing. Do NOT include any organization name, email address, or sender identity in the signature. Just use a generic professional closing like "Best regards, Procurement Department"
 3. Call send_email_to_supplier(to_email, supplier_name, subject, body) to send each RFQ.
    Use subject format: "RFQ — {product_name}" for all emails.
 
