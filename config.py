@@ -1,6 +1,7 @@
 """
 config.py — Centralised configuration via Pydantic Settings.
 All values are read from environment variables (or .env file).
+# test commit
 """
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
