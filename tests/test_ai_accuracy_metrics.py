@@ -975,6 +975,8 @@ class TestAnalysisAgentAIMetrics:
             from config import settings
             if not settings.bedrock_model_id:
                 pytest.skip("No Bedrock model configured")
+            if not settings.aws_access_key_id or not settings.aws_secret_access_key:
+                pytest.skip("No AWS credentials configured")
         except Exception:
             pytest.skip("Config not available")
 
@@ -1004,6 +1006,8 @@ class TestOfferParsingAIMetrics:
             from config import settings
             if not settings.bedrock_model_id:
                 pytest.skip("No Bedrock model configured")
+            if not settings.aws_access_key_id or not settings.aws_secret_access_key:
+                pytest.skip("No AWS credentials configured")
         except Exception:
             pytest.skip("Config not available")
 
