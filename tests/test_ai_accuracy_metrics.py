@@ -28,8 +28,7 @@ import sys
 import time
 from pathlib import Path
 from datetime import datetime, timezone
-from dataclasses import dataclass, asdict, field
-from typing import Optional
+from dataclasses import dataclass, field
 
 import pytest
 
@@ -985,7 +984,7 @@ class TestAnalysisAgentAIMetrics:
         metrics, details = run_analysis_metrics()
         summary = compute_agent_summary(metrics)
 
-        print(f"\n  Analysis Agent Metrics:")
+        print("\n  Analysis Agent Metrics:")
         for m in metrics.values():
             if (m.tp + m.fp + m.fn + m.tn) > 0:
                 print(f"    {m.field_name:15s}  P={m.precision:.2f}  R={m.recall:.2f}  F1={m.f1:.2f}")
@@ -1014,7 +1013,7 @@ class TestOfferParsingAIMetrics:
         metrics, details = run_offer_parsing_metrics()
         summary = compute_agent_summary(metrics)
 
-        print(f"\n  Offer Parsing Metrics:")
+        print("\n  Offer Parsing Metrics:")
         for m in metrics.values():
             if (m.tp + m.fp + m.fn + m.tn) > 0:
                 print(f"    {m.field_name:15s}  P={m.precision:.2f}  R={m.recall:.2f}  F1={m.f1:.2f}")
@@ -1052,7 +1051,7 @@ if __name__ == "__main__":
         analysis_metrics, analysis_details = run_analysis_metrics()
         analysis_summary = compute_agent_summary(analysis_metrics)
 
-        print(f"\n  Results:")
+        print("\n  Results:")
         for m in analysis_metrics.values():
             if (m.tp + m.fp + m.fn + m.tn) > 0:
                 print(f"    {m.field_name:15s}  P={m.precision:.2f}  R={m.recall:.2f}  F1={m.f1:.2f}")
@@ -1070,7 +1069,7 @@ if __name__ == "__main__":
         offer_metrics, offer_details = run_offer_parsing_metrics()
         offer_summary = compute_agent_summary(offer_metrics)
 
-        print(f"\n  Results:")
+        print("\n  Results:")
         for m in offer_metrics.values():
             if (m.tp + m.fp + m.fn + m.tn) > 0:
                 print(f"    {m.field_name:15s}  P={m.precision:.2f}  R={m.recall:.2f}  F1={m.f1:.2f}")
