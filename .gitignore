@@ -34,5 +34,9 @@ dist/
 # Generated agent outputs (runtime artifacts)
 outputs/
 
-# Terraform — kept locally, not pushed to GitHub yet
-terraform/
+# Terraform local state and secrets
+*.tfstate
+*.tfstate.backup
+.terraform/
+*.tfvars.local
+terraform.tfvars.local
