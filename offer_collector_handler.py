@@ -31,7 +31,6 @@ EVALUATION_DEADLINE_DAYS = int(os.environ.get("EVALUATION_DEADLINE_DAYS", "5"))
 # Hours before sending a reminder to a non-responding supplier
 REMINDER_AFTER_HOURS = int(os.environ.get("REMINDER_AFTER_HOURS", "72"))
 
-from config import settings
 from logger import get_logger
 from agents.agent_storage.agent import StorageAgent
 from agents.agent_communication.agent import CommunicationAgent

@@ -98,7 +98,7 @@ def _generate_with_reportlab(
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import mm
-    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.lib.enums import TA_CENTER
     from reportlab.platypus import (
         SimpleDocTemplate,
         Table,
@@ -198,10 +198,6 @@ def _generate_with_reportlab(
     cell_center = ParagraphStyle(
         "CellCenter", parent=cell_style,
         alignment=TA_CENTER,
-    )
-    cell_bold = ParagraphStyle(
-        "CellBold", parent=cell_center,
-        fontName="Helvetica-Bold",
     )
     header_style = ParagraphStyle(
         "HeaderCell", parent=styles["Normal"],
