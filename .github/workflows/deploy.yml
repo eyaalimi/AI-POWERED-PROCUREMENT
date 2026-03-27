@@ -1,0 +1,74 @@
+name: Deploy — Build & Push to Lambda
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 415529767461.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: procurement-agent-prod
+  LAMBDA_AGENT: procurement-agent-prod-analysis-agent
+  LAMBDA_COLLECTOR: procurement-agent-prod-analysis-agent-offer-collector
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Docker image
+        id: build
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          IMAGE_URI=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+          docker build -t $IMAGE_URI .
+          docker push $IMAGE_URI
+
+          # Also tag as latest
+          docker tag $IMAGE_URI $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+          echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
+
+      - name: Update Lambda — analysis-agent
+        run: |
+          aws lambda update-function-code \
+            --function-name $LAMBDA_AGENT \
+            --image-uri ${{ steps.build.outputs.image_uri }} \
+            --region $AWS_REGION
+
+      - name: Update Lambda — offer-collector
+        run: |
+          aws lambda update-function-code \
+            --function-name $LAMBDA_COLLECTOR \
+            --image-uri ${{ steps.build.outputs.image_uri }} \
+            --region $AWS_REGION
+
+      - name: Wait for Lambda updates to complete
+        run: |
+          aws lambda wait function-updated \
+            --function-name $LAMBDA_AGENT \
+            --region $AWS_REGION
+
+          aws lambda wait function-updated \
+            --function-name $LAMBDA_COLLECTOR \
+            --region $AWS_REGION
+
+      - name: Print deployed image
+        run: |
+          echo "Deployed: ${{ steps.build.outputs.image_uri }}"
+          echo "Git SHA : ${{ github.sha }}"
