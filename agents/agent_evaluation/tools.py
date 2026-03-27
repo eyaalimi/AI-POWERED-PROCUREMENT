@@ -7,6 +7,7 @@ Generates a comparison table as a PDF using only the Python standard library
 
 Fallback: if reportlab is not installed, generates a plain-text .txt report.
 """
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -51,8 +52,13 @@ def generate_pdf_report(
     if not scores:
         return None
 
-    out = Path(output_dir) if output_dir else PROJECT_ROOT / "outputs"
-    out.mkdir(parents=True, exist_ok=True)
+    default_dir = os.environ.get("OUTPUTS_DIR", str(PROJECT_ROOT / "outputs"))
+    out = Path(output_dir) if output_dir else Path(default_dir)
+    try:
+        out.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        out = Path("/tmp/outputs")
+        out.mkdir(parents=True, exist_ok=True)
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     filename = f"evaluation_report_{ts}.pdf"
@@ -68,150 +74,276 @@ def generate_pdf_report(
         return _generate_text_report(filepath.with_suffix(".txt"), product, procurement_spec, scores)
 
 
+def _draw_score_bar(canvas_obj, x, y, width, height, score, color):
+    """Draw a horizontal score bar with percentage fill."""
+    from reportlab.lib import colors as c
+    # Background (grey)
+    canvas_obj.setFillColor(c.HexColor("#E8E8E8"))
+    canvas_obj.roundRect(x, y, width, height, 2, fill=1, stroke=0)
+    # Filled portion
+    fill_width = max(0, min(width, width * score / 100))
+    if fill_width > 0:
+        canvas_obj.setFillColor(color)
+        canvas_obj.roundRect(x, y, fill_width, height, 2, fill=1, stroke=0)
+
+
 def _generate_with_reportlab(
     filepath: Path,
     product: str,
     spec: dict,
     scores: list,
 ) -> str:
-    """Generate PDF using reportlab."""
+    """Generate a polished PDF evaluation report."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import mm
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
     from reportlab.platypus import (
         SimpleDocTemplate,
         Table,
         TableStyle,
         Paragraph,
         Spacer,
+        HRFlowable,
     )
 
     doc = SimpleDocTemplate(
         str(filepath),
         pagesize=landscape(A4),
-        leftMargin=15 * mm,
-        rightMargin=15 * mm,
-        topMargin=15 * mm,
-        bottomMargin=15 * mm,
+        leftMargin=12 * mm,
+        rightMargin=12 * mm,
+        topMargin=12 * mm,
+        bottomMargin=12 * mm,
     )
 
     styles = getSampleStyleSheet()
+
+    # Custom styles
+    title_style = ParagraphStyle(
+        "ReportTitle", parent=styles["Title"],
+        fontSize=22, textColor=colors.HexColor("#1A237E"),
+        spaceAfter=2 * mm,
+    )
+    subtitle_style = ParagraphStyle(
+        "ReportSubtitle", parent=styles["Normal"],
+        fontSize=11, textColor=colors.HexColor("#455A64"),
+        spaceAfter=1 * mm,
+    )
+    section_style = ParagraphStyle(
+        "SectionHeader", parent=styles["Heading2"],
+        fontSize=14, textColor=colors.HexColor("#1A237E"),
+        spaceBefore=4 * mm, spaceAfter=2 * mm,
+        borderPadding=(0, 0, 2, 0),
+    )
+    rec_style = ParagraphStyle(
+        "Recommendation", parent=styles["Normal"],
+        fontSize=9, leading=13, spaceBefore=1 * mm, spaceAfter=1 * mm,
+        leftIndent=6 * mm,
+    )
+    footer_style = ParagraphStyle(
+        "Footer", parent=styles["Normal"],
+        fontSize=8, textColor=colors.HexColor("#9E9E9E"),
+        alignment=TA_CENTER,
+    )
+
     elements = []
 
-    # ── Title ────────────────────────────────────────────────────────────────
-    elements.append(Paragraph("Supplier Evaluation Report", styles["Title"]))
+    # ── Header banner ────────────────────────────────────────────────────────
+    elements.append(Paragraph("Rapport d'Évaluation des Fournisseurs", title_style))
+    elements.append(Paragraph("Matrice QCDP — Qualité, Coût, Délais, Performance", subtitle_style))
+    elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#1A237E")))
     elements.append(Spacer(1, 4 * mm))
-    elements.append(Paragraph(f"Product: {product}", styles["Heading2"]))
 
+    # ── Project info box ─────────────────────────────────────────────────────
     budget_max = spec.get("budget_max")
     quantity = spec.get("quantity")
+    unit = spec.get("unit", "")
     deadline = spec.get("deadline")
-    info_parts = []
-    if quantity:
-        info_parts.append(f"Quantity: {quantity}")
-    if budget_max:
-        info_parts.append(f"Budget: {_fmt(budget_max)} {spec.get('currency', 'TND')}")
-    if deadline:
-        info_parts.append(f"Deadline: {deadline}")
-    if info_parts:
-        elements.append(Paragraph(" | ".join(info_parts), styles["Normal"]))
+    currency = spec.get("currency", "TND")
+
+    info_data = [
+        ["Produit", product, "Quantité", f"{quantity} {unit}" if quantity else "N/A"],
+        ["Budget max", f"{_fmt(budget_max)} {currency}" if budget_max else "N/A",
+         "Délai souhaité", deadline or "Non spécifié"],
+        ["Offres reçues", str(len(scores)), "Date", datetime.now(timezone.utc).strftime("%d/%m/%Y")],
+    ]
+    info_table = Table(info_data, colWidths=[65, 150, 70, 150])
+    info_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#E8EAF6")),
+        ("BACKGROUND", (2, 0), (2, -1), colors.HexColor("#E8EAF6")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#1A237E")),
+        ("TEXTCOLOR", (2, 0), (2, -1), colors.HexColor("#1A237E")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#C5CAE9")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#E0E0E0")),
+    ]))
+    elements.append(info_table)
     elements.append(Spacer(1, 6 * mm))
 
-    # ── QCDP Comparison table ────────────────────────────────────────────────
+    # ── Classement Général (main ranking table) ──────────────────────────────
+    elements.append(Paragraph("Classement Général", section_style))
+
+    # Cell styles for wrapping text inside table cells
+    cell_style = ParagraphStyle(
+        "CellText", parent=styles["Normal"],
+        fontSize=7.5, leading=9,
+    )
+    cell_center = ParagraphStyle(
+        "CellCenter", parent=cell_style,
+        alignment=TA_CENTER,
+    )
+    cell_bold = ParagraphStyle(
+        "CellBold", parent=cell_center,
+        fontName="Helvetica-Bold",
+    )
+    header_style = ParagraphStyle(
+        "HeaderCell", parent=styles["Normal"],
+        fontSize=7.5, leading=9, fontName="Helvetica-Bold",
+        textColor=colors.white, alignment=TA_CENTER,
+    )
+
     header = [
-        "Rank",
-        "Supplier",
-        "Email",
-        "Unit Price",
-        "Total Price",
-        "Delivery\n(days)",
-        "Warranty",
-        "Payment\nTerms",
-        "Q\nQualité",
-        "C\nCoût",
-        "D\nDélais",
-        "P\nPerf/RSE",
-        "Overall\nScore",
+        Paragraph("#", header_style),
+        Paragraph("Fournisseur", header_style),
+        Paragraph("Prix<br/>unitaire", header_style),
+        Paragraph("Prix<br/>total", header_style),
+        Paragraph("Délai<br/>(jours)", header_style),
+        Paragraph("Garantie", header_style),
+        Paragraph("Paiement", header_style),
+        Paragraph("Qualité<br/>/100", header_style),
+        Paragraph("Coût<br/>/100", header_style),
+        Paragraph("Délais<br/>/100", header_style),
+        Paragraph("Perf/RSE<br/>/100", header_style),
+        Paragraph("SCORE<br/>GLOBAL", header_style),
     ]
 
     data = [header]
     for s in scores:
         row = [
-            str(s.rank),
-            s.supplier_name,
-            getattr(s, "supplier_email", "") or "N/A",
-            _fmt(s.unit_price),
-            _fmt(s.total_price),
-            _fmt(s.delivery_days),
-            s.warranty or "N/A",
-            s.payment_terms or "N/A",
-            f"{getattr(s, 'qualite_score', 0):.1f}",
-            f"{getattr(s, 'cout_score', 0):.1f}",
-            f"{getattr(s, 'delais_score', 0):.1f}",
-            f"{getattr(s, 'performance_score', 0):.1f}",
-            f"{s.overall_score:.1f}",
+            Paragraph(str(s.rank), cell_center),
+            Paragraph(s.supplier_name, cell_style),
+            Paragraph(_fmt(s.unit_price), cell_center),
+            Paragraph(_fmt(s.total_price), cell_center),
+            Paragraph(_fmt(s.delivery_days), cell_center),
+            Paragraph(s.warranty or "N/A", cell_style),
+            Paragraph(s.payment_terms or "N/A", cell_style),
+            Paragraph(f"{getattr(s, 'qualite_score', 0):.0f}", cell_center),
+            Paragraph(f"{getattr(s, 'cout_score', 0):.0f}", cell_center),
+            Paragraph(f"{getattr(s, 'delais_score', 0):.0f}", cell_center),
+            Paragraph(f"{getattr(s, 'performance_score', 0):.0f}", cell_center),
+            Paragraph(f"<b>{s.overall_score:.1f}</b>", cell_center),
         ]
         data.append(row)
 
-    col_widths = [25, 80, 95, 50, 55, 40, 55, 55, 40, 40, 40, 45, 45]
+    col_widths = [18, 90, 42, 45, 32, 75, 75, 34, 34, 34, 38, 42]
     table = Table(data, colWidths=col_widths, repeatRows=1)
 
+    # Color code for score columns
+    def _score_color(val):
+        if val >= 80:
+            return colors.HexColor("#C8E6C9")  # green
+        elif val >= 60:
+            return colors.HexColor("#FFF9C4")  # yellow
+        else:
+            return colors.HexColor("#FFCDD2")  # red
+
     style_cmds = [
-        # Header
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2C3E50")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, 0), 7),
-        ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+        # Header row background
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1A237E")),
+        # Vertical alignment
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        # Body
-        ("FONTSIZE", (0, 1), (-1, -1), 7),
-        ("ALIGN", (0, 1), (0, -1), "CENTER"),   # Rank
-        ("ALIGN", (2, 1), (-1, -1), "CENTER"),   # Numeric cols
+        # Padding
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
         # Grid
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#ECF0F1")]),
+        ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#1A237E")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#BDBDBD")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F5F5")]),
     ]
 
-    # Highlight best row
+    # Highlight #1 row in green
     if len(data) > 1:
-        style_cmds.append(
-            ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#D5F5E3"))
-        )
+        style_cmds.append(("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#C8E6C9")))
+
+    # Color-code individual QCDP score cells
+    for row_idx, s in enumerate(scores, start=1):
+        for col_idx, score_val in [
+            (7, getattr(s, 'qualite_score', 0)),
+            (8, getattr(s, 'cout_score', 0)),
+            (9, getattr(s, 'delais_score', 0)),
+            (10, getattr(s, 'performance_score', 0)),
+        ]:
+            style_cmds.append(("BACKGROUND", (col_idx, row_idx), (col_idx, row_idx), _score_color(score_val)))
 
     table.setStyle(TableStyle(style_cmds))
     elements.append(table)
-    elements.append(Spacer(1, 6 * mm))
-
-    # ── QCDP Weights legend ──────────────────────────────────────────────────
-    elements.append(
-        Paragraph(
-            "QCDP Weights: Qualité 25% | Coût 35% | Délais 20% | Performance/RSE 20%",
-            styles["Normal"],
-        )
-    )
     elements.append(Spacer(1, 4 * mm))
 
-    # ── Recommendations ──────────────────────────────────────────────────────
-    elements.append(Paragraph("Recommendations", styles["Heading2"]))
+    # ── QCDP Weights legend ──────────────────────────────────────────────────
+    weights_data = [
+        ["Qualité (Q)", "25%", "Coût (C)", "35%", "Délais (D)", "20%", "Performance/RSE (P)", "20%"],
+    ]
+    weights_table = Table(weights_data, colWidths=[65, 30, 55, 30, 55, 30, 85, 30])
+    weights_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FFF3E0")),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("FONTNAME", (0, 0), (0, 0), "Helvetica-Bold"),
+        ("FONTNAME", (2, 0), (2, 0), "Helvetica-Bold"),
+        ("FONTNAME", (4, 0), (4, 0), "Helvetica-Bold"),
+        ("FONTNAME", (6, 0), (6, 0), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (3, 0), (3, 0), "Helvetica-Bold"),
+        ("FONTNAME", (5, 0), (5, 0), "Helvetica-Bold"),
+        ("FONTNAME", (7, 0), (7, 0), "Helvetica-Bold"),
+        ("TEXTCOLOR", (1, 0), (1, 0), colors.HexColor("#E65100")),
+        ("TEXTCOLOR", (3, 0), (3, 0), colors.HexColor("#E65100")),
+        ("TEXTCOLOR", (5, 0), (5, 0), colors.HexColor("#E65100")),
+        ("TEXTCOLOR", (7, 0), (7, 0), colors.HexColor("#E65100")),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#FFB74D")),
+    ]))
+    elements.append(weights_table)
+    elements.append(Spacer(1, 6 * mm))
+
+    # ── Recommandations ──────────────────────────────────────────────────────
+    elements.append(Paragraph("Recommandations", section_style))
+    elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#C5CAE9")))
+    elements.append(Spacer(1, 2 * mm))
+
     for s in scores:
+        # Medal emoji for top 3
+        medal = {1: "1er", 2: "2ème", 3: "3ème"}.get(s.rank, f"{s.rank}ème")
+        score_color = "#2E7D32" if s.overall_score >= 75 else "#F57F17" if s.overall_score >= 50 else "#C62828"
         elements.append(
             Paragraph(
-                f"<b>#{s.rank} {s.supplier_name}</b> (Score: {s.overall_score:.1f}/100): "
-                f"{s.recommendation}",
-                styles["Normal"],
+                f'<b><font color="{score_color}">{medal}</font> — {s.supplier_name}</b>'
+                f' <font color="#757575">(Score: {s.overall_score:.1f}/100)</font><br/>'
+                f'<font color="#424242">{s.recommendation}</font>',
+                rec_style,
             )
         )
-        elements.append(Spacer(1, 2 * mm))
 
     # ── Footer ───────────────────────────────────────────────────────────────
-    elements.append(Spacer(1, 8 * mm))
+    elements.append(Spacer(1, 10 * mm))
+    elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#E0E0E0")))
+    elements.append(Spacer(1, 2 * mm))
     elements.append(
         Paragraph(
-            f"Generated on {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} "
-            f"— Procurement AI System",
-            styles["Normal"],
+            f"Rapport généré le {datetime.now(timezone.utc).strftime('%d/%m/%Y à %H:%M UTC')}"
+            f" — Procurement AI System — Confidentiel",
+            footer_style,
         )
     )
 
@@ -229,36 +361,38 @@ def _generate_text_report(
     """Fallback: generate a plain-text report."""
     lines = [
         "=" * 70,
-        "SUPPLIER EVALUATION REPORT",
+        "RAPPORT D'ÉVALUATION DES FOURNISSEURS",
+        "Matrice QCDP — Qualité, Coût, Délais, Performance",
         "=" * 70,
-        f"Product : {product}",
-        f"Quantity: {spec.get('quantity', 'N/A')}",
-        f"Budget  : {_fmt(spec.get('budget_max'))}",
-        f"Deadline: {spec.get('deadline', 'N/A')}",
+        f"Produit  : {product}",
+        f"Quantité : {spec.get('quantity', 'N/A')} {spec.get('unit', '')}",
+        f"Budget   : {_fmt(spec.get('budget_max'))} {spec.get('currency', 'TND')}",
+        f"Délai    : {spec.get('deadline', 'Non spécifié')}",
+        f"Offres   : {len(scores)}",
         "",
         "-" * 70,
     ]
 
     for s in scores:
         lines.extend([
-            f"Rank #{s.rank}: {s.supplier_name}",
-            f"  Email        : {getattr(s, 'supplier_email', '') or 'N/A'}",
-            f"  Unit Price   : {_fmt(s.unit_price)}",
-            f"  Total Price  : {_fmt(s.total_price)} {s.currency}",
-            f"  Delivery     : {_fmt(s.delivery_days)} days",
-            f"  Warranty     : {s.warranty or 'N/A'}",
-            f"  Payment Terms: {s.payment_terms or 'N/A'}",
-            f"  QCDP → Q(Qualité): {getattr(s, 'qualite_score', 0):.1f}"
-            f"  C(Coût): {getattr(s, 'cout_score', 0):.1f}"
-            f"  D(Délais): {getattr(s, 'delais_score', 0):.1f}"
-            f"  P(Perf/RSE): {getattr(s, 'performance_score', 0):.1f}",
-            f"  Overall Score: {s.overall_score:.1f} / 100",
-            f"  Recommendation: {s.recommendation}",
+            f"#{s.rank} — {s.supplier_name}",
+            f"  Email          : {getattr(s, 'supplier_email', '') or 'N/A'}",
+            f"  Prix unitaire  : {_fmt(s.unit_price)} TND",
+            f"  Prix total     : {_fmt(s.total_price)} {s.currency}",
+            f"  Délai livraison: {_fmt(s.delivery_days)} jours",
+            f"  Garantie       : {s.warranty or 'N/A'}",
+            f"  Paiement       : {s.payment_terms or 'N/A'}",
+            f"  Qualité  : {getattr(s, 'qualite_score', 0):5.1f}/100  (25%)",
+            f"  Coût     : {getattr(s, 'cout_score', 0):5.1f}/100  (35%)",
+            f"  Délais   : {getattr(s, 'delais_score', 0):5.1f}/100  (20%)",
+            f"  Perf/RSE : {getattr(s, 'performance_score', 0):5.1f}/100  (20%)",
+            f"  SCORE GLOBAL : {s.overall_score:.1f} / 100",
+            f"  Recommandation : {s.recommendation}",
             "-" * 70,
         ])
 
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    lines.append(f"\nGenerated on {ts} — Procurement AI System")
+    lines.append(f"\nRapport généré le {ts} — Procurement AI System — Confidentiel")
 
     filepath.write_text("\n".join(lines), encoding="utf-8")
     logger.info("Text report generated (fallback)", extra={"path": str(filepath)})

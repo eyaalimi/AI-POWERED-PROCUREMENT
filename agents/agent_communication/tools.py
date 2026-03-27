@@ -115,7 +115,7 @@ def retry_find_supplier_email(supplier_name: str, website: str) -> str:
 # ── Inbox monitoring ─────────────────────────────────────────────────────────
 
 @tool
-def fetch_supplier_replies(rfq_subject_prefix: str) -> str:
+def fetch_supplier_replies(rfq_subject_prefix: str, received_after: str = "") -> str:
     """
     Check Gmail inbox for supplier replies to RFQ emails.
     Looks for emails whose subject contains the RFQ subject prefix.
@@ -123,6 +123,9 @@ def fetch_supplier_replies(rfq_subject_prefix: str) -> str:
     Args:
         rfq_subject_prefix: The subject prefix used in sent RFQs
                             (e.g. "RFQ — ergonomic office chairs")
+        received_after: ISO datetime string — only return emails received after
+                        this timestamp (e.g. "2026-03-27T14:00:00+00:00").
+                        Defaults to today's date to avoid picking up old emails.
 
     Returns:
         JSON array of reply objects with keys:
@@ -134,92 +137,91 @@ def fetch_supplier_replies(rfq_subject_prefix: str) -> str:
         print(f"  [DRY-RUN] Simulating 5 supplier replies for: {rfq_subject_prefix}")
         fake_replies = [
             {
-                "from_email": "ventes@techsouris.tn",
+                "from_email": "ventes@cosmetiques-tunisia.tn",
                 "subject": f"Re: {rfq_subject_prefix}",
                 "body": (
                     "Bonjour,\n\n"
-                    "Suite à votre demande de devis pour des souris informatiques, "
-                    "veuillez trouver notre offre ci-dessous :\n"
-                    "- Produit : Souris sans fil Logitech M185\n"
-                    "- Prix unitaire : 45 TND HT\n"
-                    "- Délai de livraison : 5 jours ouvrables\n"
-                    "- Garantie : 2 ans constructeur\n"
+                    "Suite à votre demande de devis, veuillez trouver notre offre :\n"
+                    "- Produit : L'Oréal Elseve Total Repair 5 Shampooing 250ml\n"
+                    "- Prix unitaire : 12.500 TND HT\n"
+                    "- Délai de livraison : 3 jours ouvrables\n"
+                    "- Garantie : Produit original, date d'expiration > 18 mois\n"
                     "- Conditions de paiement : Net 30 jours\n"
-                    "- Livraison gratuite à partir de 50 unités\n"
-                    "- Certification CE, conformité RSE\n\n"
-                    "Cordialement,\nKarim Ben Salah\nTechSouris SARL"
+                    "- Livraison gratuite à partir de 100 unités\n"
+                    "- Distributeur agréé L'Oréal, certification ISO 9001\n\n"
+                    "Cordialement,\nKarim Ben Salah\nCosmétiques Tunisia SARL"
                 ),
                 "has_pdf": False,
                 "received_at": datetime.now(timezone.utc).isoformat(),
             },
             {
-                "from_email": "commercial@peripheriques-pro.tn",
+                "from_email": "commercial@beaute-pro.tn",
                 "subject": f"Re: {rfq_subject_prefix}",
                 "body": (
                     "Madame, Monsieur,\n\n"
                     "Nous avons le plaisir de vous soumettre notre proposition :\n"
-                    "- Produit : Souris filaire HP 125\n"
-                    "- Prix unitaire : 28 TND HT\n"
-                    "- Délai de livraison : 3 jours ouvrables\n"
-                    "- Garantie : 1 an\n"
+                    "- Produit : L'Oréal Elseve Color-Vive Shampooing 250ml\n"
+                    "- Prix unitaire : 14.800 TND HT\n"
+                    "- Délai de livraison : 5 jours ouvrables\n"
+                    "- Garantie : Produit authentique, traçabilité complète\n"
                     "- Conditions de paiement : 50% à la commande, solde à la livraison\n"
-                    "- Stock disponible : 500 unités\n"
-                    "- Pas de certification RSE\n\n"
-                    "Restant à votre disposition,\nSonia Maalej\nPériphériques Pro"
+                    "- Stock permanent : 2000+ unités\n"
+                    "- Certification RSE et emballage éco-responsable\n\n"
+                    "Restant à votre disposition,\nSonia Maalej\nBeauté Pro Distribution"
                 ),
                 "has_pdf": False,
                 "received_at": datetime.now(timezone.utc).isoformat(),
             },
             {
-                "from_email": "info@bureautique-express.tn",
+                "from_email": "info@hygiene-express.tn",
                 "subject": f"Re: {rfq_subject_prefix}",
                 "body": (
                     "Bonjour,\n\n"
                     "En réponse à votre appel d'offres, voici notre meilleure proposition :\n"
-                    "- Produit : Souris ergonomique Microsoft Ergonomic Mouse\n"
-                    "- Prix unitaire : 89 TND HT\n"
-                    "- Délai de livraison : 10 jours ouvrables\n"
-                    "- Garantie : 3 ans\n"
+                    "- Produit : L'Oréal Elseve Arginine Resist x3 Shampooing 400ml\n"
+                    "- Prix unitaire : 18.900 TND HT\n"
+                    "- Délai de livraison : 7 jours ouvrables\n"
+                    "- Garantie : 2 ans avant expiration\n"
                     "- Conditions de paiement : Net 45 jours\n"
-                    "- Design ergonomique certifié, réduit les TMS\n"
-                    "- Certification RSE et emballage recyclable\n\n"
-                    "Bien cordialement,\nAhmed Trabelsi\nBureautique Express"
+                    "- Format économique 400ml, meilleur rapport qualité/prix\n"
+                    "- Fournisseur certifié ISO 14001, engagement RSE\n\n"
+                    "Bien cordialement,\nAhmed Trabelsi\nHygiène Express"
                 ),
                 "has_pdf": False,
                 "received_at": datetime.now(timezone.utc).isoformat(),
             },
             {
-                "from_email": "devis@clickmania.tn",
+                "from_email": "devis@parapharma-direct.tn",
                 "subject": f"Re: {rfq_subject_prefix}",
                 "body": (
-                    "Hello,\n\n"
-                    "Thank you for your RFQ. Please find our quotation:\n"
-                    "- Product: Souris gaming Razer DeathAdder V3\n"
-                    "- Unit price: 135 TND excl. tax\n"
-                    "- Delivery: 7 business days\n"
-                    "- Warranty: 2 years\n"
-                    "- Payment terms: Net 30 days\n"
-                    "- RGB lighting, 30K DPI sensor\n"
-                    "- No RSE certification\n\n"
-                    "Best regards,\nMehdi Gharbi\nClickMania Distribution"
+                    "Bonjour,\n\n"
+                    "Merci pour votre consultation. Voici notre offre :\n"
+                    "- Produit : L'Oréal Elseve Huile Extraordinaire Shampooing 250ml\n"
+                    "- Prix unitaire : 16.200 TND HT\n"
+                    "- Délai de livraison : 10 jours ouvrables\n"
+                    "- Garantie : Produit original sous scellé\n"
+                    "- Conditions de paiement : Net 30 jours\n"
+                    "- Gamme premium, forte demande client\n"
+                    "- Pas de certification RSE\n\n"
+                    "Cordialement,\nMehdi Gharbi\nParaPharma Direct"
                 ),
                 "has_pdf": False,
                 "received_at": datetime.now(timezone.utc).isoformat(),
             },
             {
-                "from_email": "contact@fournitures-sahara.tn",
+                "from_email": "contact@soins-sahara.tn",
                 "subject": f"Re: {rfq_subject_prefix}",
                 "body": (
                     "Bonjour,\n\n"
                     "Nous vous remercions pour votre consultation. Notre offre :\n"
-                    "- Produit : Souris sans fil Dell MS3320W\n"
-                    "- Prix unitaire : 62 TND HT\n"
+                    "- Produit : L'Oréal Elseve Dream Long Shampooing 250ml\n"
+                    "- Prix unitaire : 13.500 TND HT\n"
                     "- Délai de livraison : 14 jours\n"
-                    "- Garantie : 2 ans\n"
+                    "- Garantie : Produit certifié, lot traçable\n"
                     "- Conditions de paiement : Net 60 jours\n"
-                    "- Double connectivité Bluetooth + USB\n"
+                    "- Grossiste agréé, prix dégressif dès 200 unités\n"
                     "- Fournisseur certifié ISO 14001 (RSE)\n\n"
-                    "Cordialement,\nFatma Bouazizi\nFournitures Sahara"
+                    "Cordialement,\nFatma Bouazizi\nSoins Sahara Distribution"
                 ),
                 "has_pdf": False,
                 "received_at": datetime.now(timezone.utc).isoformat(),
@@ -250,7 +252,18 @@ def fetch_supplier_replies(rfq_subject_prefix: str) -> str:
                 if word.isascii() and len(word) > 2 and word.isalpha():
                     simple_keyword = word
                     break
-        search_query = f'(SUBJECT "{simple_keyword}")'
+        # Build IMAP SINCE filter — use received_after date or today as minimum
+        since_dt = None
+        if received_after:
+            try:
+                since_dt = datetime.fromisoformat(received_after.replace("Z", "+00:00"))
+            except Exception:
+                pass
+        if since_dt is None:
+            since_dt = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        imap_since = since_dt.strftime("%d-%b-%Y")
+        search_query = f'(SUBJECT "{simple_keyword}" SINCE "{imap_since}")'
+
         _, msg_nums = conn.search(None, search_query)
         ids = msg_nums[0].split()
 
@@ -303,12 +316,26 @@ def fetch_supplier_replies(rfq_subject_prefix: str) -> str:
             if "<" in from_addr and ">" in from_addr:
                 sender_email = from_addr.split("<")[1].split(">")[0]
 
+            received_at_raw = msg.get("Date", "")
+
+            # Post-fetch time filter: skip emails before received_after
+            if since_dt and received_at_raw:
+                try:
+                    import email.utils as _eutils
+                    msg_dt = _eutils.parsedate_to_datetime(received_at_raw)
+                    if msg_dt.tzinfo is None:
+                        msg_dt = msg_dt.replace(tzinfo=timezone.utc)
+                    if msg_dt < since_dt:
+                        continue
+                except Exception:
+                    pass
+
             replies.append({
                 "from_email": sender_email.strip(),
                 "subject": msg.get("Subject", ""),
                 "body": full_body[:5000],
                 "has_pdf": len(pdf_texts) > 0,
-                "received_at": msg.get("Date", ""),
+                "received_at": received_at_raw,
             })
 
         conn.logout()

@@ -371,13 +371,15 @@ Process each supplier: recover missing emails if needed, write the RFQ, and send
 
     # ── Phase 2: Check responses ──────────────────────────────────────────────
 
-    def check_responses(self, rfq_records: list, product: str) -> list:
+    def check_responses(self, rfq_records: list, product: str, received_after: str = "") -> list:
         """
         Check Gmail inbox for supplier replies and parse offers.
 
         Args:
             rfq_records: list[RFQRecord] or list[dict] from Phase 1
             product: product name for subject matching
+            received_after: ISO datetime — only consider emails after this time
+                            (prevents false positives from old emails)
 
         Returns:
             list[SupplierOffer] — parsed offers from supplier replies
@@ -398,11 +400,14 @@ Process each supplier: recover missing emails if needed, write the RFQ, and send
             extra={"product": product, "sent_count": len(sent_emails)},
         )
 
+        after_clause = f'\nOnly include emails received after: {received_after}' if received_after else ""
         prompt = f"""
 Check the inbox for replies to our RFQ emails.
 The RFQ subject prefix is: "{rfq_subject}"
 
 We sent RFQs to these suppliers: {json.dumps(sent_emails)}
+{after_clause}
+When calling fetch_supplier_replies, pass received_after="{received_after or datetime.now(timezone.utc).isoformat()}"
 
 Fetch replies and parse any supplier offers found.
 """
@@ -535,11 +540,13 @@ Write a polite follow-up in French and send each reminder.
         """
         product = procurement_spec.get("product", "")
 
-        # Phase 1: Send RFQs
+        # Phase 1: Send RFQs — capture time just before sending
+        rfqs_sent_at = datetime.now(timezone.utc).isoformat()
         rfq_records = self.send_rfqs(procurement_spec, supplier_list)
 
         # Phase 2: Check for immediate responses (unlikely but possible)
-        offers = self.check_responses(rfq_records, product)
+        # Pass rfqs_sent_at to prevent false positives from old emails
+        offers = self.check_responses(rfq_records, product, received_after=rfqs_sent_at)
 
         # Determine pending suppliers
         responded_emails = {o.supplier_email.lower() for o in offers}

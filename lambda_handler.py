@@ -7,17 +7,19 @@ Trigger: S3 Event Notification (SES stores raw email in S3 → S3 triggers Lambd
 Flow:
   1. SES receives email → stores the raw .eml in S3
   2. S3 notification triggers this Lambda
-  3. Lambda downloads the .eml, parses it, runs the Analysis Agent
-  4. Saves result JSON back to S3 (outputs/ prefix)
-  5. Sends an ACK email to the requester via SMTP
+  3. Lambda downloads the .eml, parses it
+  4. Sends an ACK email to the requester (immediately)
+  5. Runs the full Orchestrator pipeline (5 agents):
+       Analysis → Sourcing → RFQ Communication → Storage → Evaluation
+  6. Saves PipelineResult JSON back to S3 (outputs/ prefix)
 """
 import json
 import os
 import sys
 import boto3
 import urllib.parse
-from datetime import datetime
 from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 
 # ── Make project modules importable ───────────────────────────────────────────
@@ -26,17 +28,21 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+# ── Override outputs dir to /tmp (Lambda /var/task is read-only) ──────────────
+os.environ.setdefault("OUTPUTS_DIR", "/tmp/outputs")
+
 from config import settings
 from logger import get_logger
 from email_gateway.parser import EmailParser
-from agents.analysis.agent import AnalysisAgent, send_request_acknowledgment
+from agents.analysis.agent import send_request_acknowledgment
+from agents.orchestrator.agent import Orchestrator
 
 logger = get_logger(__name__)
 
 # ── Singletons (reused across warm Lambda invocations) ────────────────────────
 _s3_client = boto3.client("s3", region_name=settings.aws_region)
 _parser = EmailParser()
-_agent = AnalysisAgent()
+_orchestrator = Orchestrator()
 
 # Output bucket: reuse the same bucket but store results under outputs/ prefix
 OUTPUT_BUCKET = os.environ.get("S3_BUCKET_NAME", "")
@@ -80,7 +86,7 @@ def handler(event, context):
 # ── S3 handler ─────────────────────────────────────────────────────────────────
 
 def _handle_s3_record(record: dict) -> dict:
-    """Download raw email from S3, parse and analyze it."""
+    """Download raw email from S3, parse and run the full pipeline."""
     bucket = record["s3"]["bucket"]["name"]
     key = urllib.parse.unquote_plus(record["s3"]["object"]["key"])
 
@@ -139,7 +145,7 @@ def _handle_ses_record(record: dict) -> dict:
 # ── Core processing ────────────────────────────────────────────────────────────
 
 def _process_email(raw_bytes: bytes, source_key: str = "") -> dict:
-    """Parse → Analyze → ACK → Save to S3."""
+    """Parse → ACK → Full Orchestrator pipeline (5 agents) → Save to S3."""
     try:
         parsed = _parser.parse(raw_bytes)
     except Exception as exc:
@@ -151,31 +157,46 @@ def _process_email(raw_bytes: bytes, source_key: str = "") -> dict:
         extra={"from": parsed.from_email, "subject": parsed.subject},
     )
 
-    try:
-        spec = _agent.analyze(parsed.body, parsed.from_email)
-    except Exception as exc:
-        logger.error("Analysis agent failed", extra={"error": str(exc)})
-        return {"status": "analysis_error", "reason": str(exc)}
-
-    # ── Send ACK email ─────────────────────────────────────────────
+    # ── Send ACK email immediately (before pipeline runs) ──────────────
     try:
         send_request_acknowledgment(
-            requester_email=spec.requester_email or parsed.from_email,
-            is_valid=spec.is_valid,
-            product=spec.product,
+            requester_email=parsed.from_email,
+            is_valid=True,  # Optimistic ACK — analysis happens in pipeline
+            product=parsed.subject,
         )
-        logger.info("ACK sent", extra={"to": spec.requester_email})
+        logger.info("ACK sent", extra={"to": parsed.from_email})
     except Exception as exc:
-        logger.warning("ACK email failed", extra={"error": str(exc)})
+        logger.warning("ACK email failed (non-blocking)", extra={"error": str(exc)})
 
-    # ── Save result to S3 ──────────────────────────────────────────
-    result_dict = asdict(spec)
+    # ── Run full Orchestrator pipeline ─────────────────────────────────
+    try:
+        pipeline_result = _orchestrator.run(
+            email_body=parsed.body,
+            requester_email=parsed.from_email,
+            attachment_text=getattr(parsed, "attachment_text", ""),
+        )
+        logger.info(
+            "Pipeline completed",
+            extra={
+                "status": pipeline_result.status,
+                "product": pipeline_result.product,
+                "suppliers_found": pipeline_result.suppliers_found,
+                "rfqs_sent": pipeline_result.rfqs_sent,
+                "offers_received": pipeline_result.offers_received,
+            },
+        )
+    except Exception as exc:
+        logger.error("Orchestrator pipeline failed", extra={"error": str(exc)})
+        return {"status": "pipeline_error", "reason": str(exc)}
+
+    # ── Save PipelineResult to S3 ──────────────────────────────────────
+    result_dict = asdict(pipeline_result)
     result_dict["source_email_key"] = source_key
     result_dict["processed_at"] = datetime.utcnow().isoformat()
 
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-    label = "valid" if spec.is_valid else "rejected"
-    output_key = f"{OUTPUT_PREFIX}analysis_{label}_{ts}.json"
+    label = pipeline_result.status
+    output_key = f"{OUTPUT_PREFIX}pipeline_{label}_{ts}.json"
 
     if OUTPUT_BUCKET:
         try:
@@ -185,16 +206,19 @@ def _process_email(raw_bytes: bytes, source_key: str = "") -> dict:
                 Body=json.dumps(result_dict, ensure_ascii=False, indent=2, default=str).encode("utf-8"),
                 ContentType="application/json",
             )
-            logger.info("Result saved to S3", extra={"key": output_key})
+            logger.info("Pipeline result saved to S3", extra={"key": output_key})
         except Exception as exc:
             logger.warning("Failed to save result to S3", extra={"error": str(exc)})
     else:
         logger.warning("OUTPUT_BUCKET not set — result not persisted")
 
     return {
-        "status": "ok",
-        "is_valid": spec.is_valid,
-        "product": spec.product,
-        "requester": spec.requester_email,
+        "status": pipeline_result.status,
+        "product": pipeline_result.product,
+        "request_id": pipeline_result.request_id,
+        "suppliers_found": pipeline_result.suppliers_found,
+        "rfqs_sent": pipeline_result.rfqs_sent,
+        "offers_received": pipeline_result.offers_received,
+        "best_offer": pipeline_result.best_offer,
         "output_key": output_key,
     }

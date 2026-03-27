@@ -53,6 +53,7 @@ resource "aws_secretsmanager_secret" "tavily_api_key" {
 }
 
 resource "aws_secretsmanager_secret_version" "tavily_api_key" {
+  count         = var.tavily_api_key != "" ? 1 : 0
   secret_id     = aws_secretsmanager_secret.tavily_api_key.id
   secret_string = var.tavily_api_key
 }

@@ -5,7 +5,7 @@
 aws_region           = "us-east-1"
 image_tag            = "latest"    # Use a specific git SHA in production (e.g. "a1b2c3d")
 bedrock_model_id     = "us.anthropic.claude-sonnet-4-20250514-v1:0"
-ses_recipient_emails = []    # e.g. ["procurement@yourdomain.com"]
+ses_recipient_emails = ["test@procurement-ai.click"]
 
 # ── Credentials (set via TF_VAR_* env vars or terraform.tfvars.local) ─────
 gmail_address        = ""

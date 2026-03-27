@@ -165,7 +165,10 @@ resource "aws_iam_role_policy" "lambda_bedrock" {
         "bedrock:InvokeModel",
         "bedrock:InvokeModelWithResponseStream"
       ]
-      Resource = "arn:aws:bedrock:${var.aws_region}::foundation-model/*"
+      Resource = [
+        "arn:aws:bedrock:*::foundation-model/*",
+        "arn:aws:bedrock:*:${local.account_id}:inference-profile/*"
+      ]
     }]
   })
 }
@@ -190,6 +193,9 @@ resource "aws_lambda_function" "agent" {
       S3_OUTPUT_PREFIX      = "outputs/"
       SMTP_HOST            = "smtp.gmail.com"
       SMTP_PORT            = "587"
+      GMAIL_ADDRESS        = var.gmail_address
+      GMAIL_APP_PASSWORD   = var.gmail_app_password
+      TAVILY_API_KEY       = var.tavily_api_key
       LOG_LEVEL            = var.log_level
       APP_ENV              = "production"
       # Credentials loaded from Secrets Manager at runtime
@@ -259,4 +265,71 @@ resource "aws_ses_receipt_rule" "store_in_s3" {
     object_key_prefix = "emails/"
     position    = 1
   }
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Offer Collector Lambda — polls Gmail IMAP every 15 min for supplier replies
+# Uses the same container image as the main agent Lambda
+# ══════════════════════════════════════════════════════════════════════════════
+resource "aws_lambda_function" "offer_collector" {
+  function_name = "${local.function_name}-offer-collector"
+  role          = aws_iam_role.lambda_exec.arn
+  package_type  = "Image"
+  image_uri     = "${aws_ecr_repository.agent.repository_url}:${var.image_tag}"
+  memory_size   = 512
+  timeout       = 300   # 5 minutes
+
+  image_config {
+    command = ["offer_collector_handler.handler"]
+  }
+
+  environment {
+    variables = {
+      AWS_REGION_NAME    = var.aws_region
+      BEDROCK_MODEL_ID   = var.bedrock_model_id
+      S3_BUCKET_NAME     = aws_s3_bucket.emails.bucket
+      S3_OUTPUT_PREFIX   = "outputs/"
+      SMTP_HOST          = "smtp.gmail.com"
+      SMTP_PORT          = "587"
+      GMAIL_ADDRESS      = var.gmail_address
+      GMAIL_APP_PASSWORD = var.gmail_app_password
+      TAVILY_API_KEY     = var.tavily_api_key
+      LOG_LEVEL          = var.log_level
+      APP_ENV            = "production"
+      OUTPUTS_DIR               = "/tmp/outputs"
+      DATABASE_URL              = "postgresql://${aws_db_instance.postgres.username}:${urlencode(random_password.db_password.result)}@${aws_db_instance.postgres.address}:${aws_db_instance.postgres.port}/${aws_db_instance.postgres.db_name}"
+      EVALUATION_DEADLINE_DAYS  = "5"
+      REMINDER_AFTER_HOURS      = "72"
+    }
+  }
+
+  tags = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "offer_collector" {
+  name              = "/aws/lambda/${local.function_name}-offer-collector"
+  retention_in_days = 30
+  tags              = var.tags
+}
+
+# ── EventBridge (CloudWatch Events) scheduled rule — every 15 minutes ────────
+resource "aws_cloudwatch_event_rule" "offer_check" {
+  name                = "${var.project_name}-offer-check"
+  description         = "Poll Gmail every 15 minutes for supplier RFQ replies"
+  schedule_expression = "rate(15 minutes)"
+  tags                = var.tags
+}
+
+resource "aws_cloudwatch_event_target" "offer_check" {
+  rule      = aws_cloudwatch_event_rule.offer_check.name
+  target_id = "OfferCollectorLambda"
+  arn       = aws_lambda_function.offer_collector.arn
+}
+
+resource "aws_lambda_permission" "eventbridge_invoke_collector" {
+  statement_id  = "AllowEventBridgeInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.offer_collector.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.offer_check.arn
 }

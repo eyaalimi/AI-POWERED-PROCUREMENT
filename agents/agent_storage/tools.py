@@ -166,14 +166,20 @@ class StorageTools:
         session = self._session()
         try:
             req_uuid = uuid.UUID(request_id)
+            # Fallback: first known supplier/rfq pair (used when test email ≠ real supplier)
+            fallback_supplier_id = next(iter(supplier_map.values()), None) if supplier_map else None
+            fallback_rfq_id = next(iter(rfq_map.values()), None) if rfq_map else None
             result = []
             for o in offers:
                 email = o.get("supplier_email", "")
-                supplier_id = supplier_map.get(email)
-                rfq_id = rfq_map.get(email)
+                supplier_id = supplier_map.get(email) or fallback_supplier_id
+                rfq_id = rfq_map.get(email) or fallback_rfq_id
                 if not supplier_id or not rfq_id:
                     logger.warning("Missing supplier/rfq mapping for offer", extra={"email": email})
                     continue
+                if email not in supplier_map:
+                    logger.info("Offer email not in supplier map — assigned to fallback supplier",
+                                extra={"email": email})
 
                 offer = Offer(
                     request_id=req_uuid,
@@ -303,6 +309,68 @@ class StorageTools:
                     "received_at": o.received_at.isoformat() if o.received_at else None,
                 }
                 for o in offers
+            ]
+        finally:
+            session.close()
+
+    def get_pending_requests(self) -> list:
+        """
+        Fetch all procurement requests with status='awaiting_responses'.
+        Returns list of dicts including the rfqs for each request.
+        """
+        session = self._session()
+        try:
+            requests = session.query(ProcurementRequest).filter_by(
+                status="awaiting_responses"
+            ).all()
+            result = []
+            for req in requests:
+                rfqs = session.query(RFQ).filter_by(
+                    request_id=req.id
+                ).all()
+                result.append({
+                    "id": str(req.id),
+                    "product": req.product,
+                    "category": req.category,
+                    "quantity": req.quantity,
+                    "unit": req.unit,
+                    "budget_min": req.budget_min,
+                    "budget_max": req.budget_max,
+                    "deadline": req.deadline,
+                    "requester_email": req.requester_email,
+                    "status": req.status,
+                    "created_at": req.created_at.isoformat() if req.created_at else None,
+                    "rfqs": [
+                        {
+                            "id": str(r.id),
+                            "supplier_id": str(r.supplier_id),
+                            "subject": r.subject,
+                            "status": r.status,
+                            "sent_at": r.sent_at.isoformat() if r.sent_at else None,
+                            "reminder_sent": r.reminder_sent,
+                        }
+                        for r in rfqs
+                    ],
+                })
+            return result
+        finally:
+            session.close()
+
+    def get_suppliers_for_request(self, request_id: str) -> list:
+        """Fetch all suppliers for a request."""
+        session = self._session()
+        try:
+            suppliers = session.query(Supplier).filter_by(
+                request_id=uuid.UUID(request_id)
+            ).all()
+            return [
+                {
+                    "id": str(s.id),
+                    "name": s.name,
+                    "email": s.email,
+                    "website": s.website,
+                }
+                for s in suppliers
             ]
         finally:
             session.close()

@@ -155,6 +155,11 @@ class StorageAgent:
 
         stored_offers = self.store_offers(request_id, offers, supplier_map, rfq_map)
 
+        # If RFQs were sent but no offers yet, mark as awaiting_responses
+        # so the offer_collector Lambda can pick it up later
+        if rfq_map and not stored_offers:
+            self._tools.update_request_status(request_id, "awaiting_responses")
+
         return StorageResult(
             request_id=request_id,
             suppliers_stored=len(supplier_map),
