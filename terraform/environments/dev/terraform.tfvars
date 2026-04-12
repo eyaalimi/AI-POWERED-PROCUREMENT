@@ -11,6 +11,7 @@ ses_recipient_emails = []    # e.g. ["dev-procurement@yourdomain.com"]
 gmail_address        = ""
 gmail_app_password   = ""
 tavily_api_key       = ""
+jwt_secret           = ""
 
 # ── Dashboard ─────────────────────────────────────────────────────────────
 domain_name = "procurement-ai.click"

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { BarChart3, GitBranch, Activity, Truck, Shield, Mail, Package, Zap, LogOut, User } from 'lucide-react';
+import { BarChart3, GitBranch, Activity, Truck, Shield, Mail, Package, Zap, LogOut, User, Users, FilePlus, DollarSign } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -19,6 +19,7 @@ export default function Sidebar() {
       links: [
         { to: '/', icon: BarChart3, label: 'Dashboard' },
         { to: '/inbox', icon: Mail, label: 'Inbox', badge: true },
+        { to: '/new-request', icon: FilePlus, label: 'New Request' },
       ],
     },
     {
@@ -33,7 +34,11 @@ export default function Sidebar() {
       label: 'Management',
       links: [
         { to: '/suppliers', icon: Truck, label: 'Suppliers' },
-        ...(user?.role === 'admin' ? [{ to: '/blacklist', icon: Shield, label: 'Blacklist' }] : []),
+        { to: '/budget', icon: DollarSign, label: 'Budget' },
+        ...(user?.role === 'admin' ? [
+          { to: '/blacklist', icon: Shield, label: 'Blacklist' },
+          { to: '/users', icon: Users, label: 'Team Members' },
+        ] : []),
       ],
     },
   ];

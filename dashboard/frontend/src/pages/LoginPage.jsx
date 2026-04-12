@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Zap, Mail, Lock, AlertCircle } from 'lucide-react';
 
@@ -78,7 +78,7 @@ export default function LoginPage() {
         </form>
 
         <div className="auth-footer">
-          Don't have an account? <Link to="/register">Register</Link>
+          Contact your admin to get an account
         </div>
       </div>
     </div>

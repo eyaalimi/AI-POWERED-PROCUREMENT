@@ -4,6 +4,7 @@ Procurement request endpoints — list, detail, timeline.
 import uuid
 
 from fastapi import APIRouter, Depends, Query, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, extract
 
@@ -15,11 +16,73 @@ from dashboard.api.deps import get_db, get_current_user
 router = APIRouter()
 
 
+class NewRequestBody(BaseModel):
+    product: str
+    category: str = ""
+    quantity: float | None = None
+    unit: str = ""
+    budget_min: float | None = None
+    budget_max: float | None = None
+    deadline: str = ""
+    department: str = ""
+    notes: str = ""
+
+
 def _scope_request_query(query, user: User):
     query = query.filter(ProcurementRequest.company_id == user.company_id)
     if user.role == "employee":
         query = query.filter(ProcurementRequest.created_by_id == user.id)
     return query
+
+
+@router.post("")
+def create_request(
+    body: NewRequestBody,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Employee or admin creates a new procurement request from the dashboard."""
+    req = ProcurementRequest(
+        product=body.product.strip(),
+        category=body.category.strip() or None,
+        quantity=body.quantity,
+        unit=body.unit.strip() or None,
+        budget_min=body.budget_min,
+        budget_max=body.budget_max,
+        deadline=body.deadline.strip() or None,
+        requester_email=current_user.email,
+        status="pending",
+        company_id=current_user.company_id,
+        created_by_id=current_user.id,
+    )
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+
+    # Build mailto link for Gmail notification
+    subject = f"[Procurement Request] {body.product.strip()}"
+    lines = [f"Product: {body.product.strip()}"]
+    if body.category:
+        lines.append(f"Category: {body.category}")
+    if body.quantity:
+        lines.append(f"Quantity: {body.quantity} {body.unit}")
+    if body.budget_min or body.budget_max:
+        lines.append(f"Budget: {body.budget_min or '?'} - {body.budget_max or '?'} TND")
+    if body.deadline:
+        lines.append(f"Deadline: {body.deadline}")
+    if body.department:
+        lines.append(f"Department: {body.department}")
+    if body.notes:
+        lines.append(f"Notes: {body.notes}")
+    lines.append(f"\nRequested by: {current_user.name} ({current_user.email})")
+    email_body = "\n".join(lines)
+
+    return {
+        "id": str(req.id),
+        "status": "created",
+        "mailto_subject": subject,
+        "mailto_body": email_body,
+    }
 
 
 @router.get("")

@@ -17,6 +17,9 @@ ses_recipient_emails = ["procurement@yourdomain.com"]
 gmail_address      = "your-email@gmail.com"
 gmail_app_password = "your16charapppassword"  # No spaces
 
+# JWT secret for dashboard authentication
+jwt_secret = "change-me-to-a-random-string-at-least-32-chars"
+
 # Optional: PostgreSQL connection string (leave empty if not used)
 database_url = ""
 

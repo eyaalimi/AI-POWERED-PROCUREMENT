@@ -246,6 +246,7 @@ resource "aws_lambda_function" "dashboard" {
   environment {
     variables = {
       DATABASE_URL = "postgresql://${aws_db_instance.postgres.username}:${urlencode(random_password.db_password.result)}@${aws_db_instance.postgres.address}:${aws_db_instance.postgres.port}/${aws_db_instance.postgres.db_name}"
+      JWT_SECRET   = var.jwt_secret
       LOG_LEVEL    = var.log_level
       APP_ENV      = "production"
     }

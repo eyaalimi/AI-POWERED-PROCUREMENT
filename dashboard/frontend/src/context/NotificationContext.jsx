@@ -6,7 +6,14 @@ export function useNotifications() {
   return useContext(NotificationContext);
 }
 
-const API_BASE = 'http://localhost:8000/api';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api';
+
+function authHeaders() {
+  const token = localStorage.getItem('token');
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
 
 export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
@@ -21,7 +28,7 @@ export function NotificationProvider({ children }) {
 
     const poll = async () => {
       try {
-        const res = await fetch(`${API_BASE}/emails/inbox?limit=20`);
+        const res = await fetch(`${API_BASE}/emails/inbox?limit=20`, { headers: authHeaders() });
         if (!res.ok) return;
         const json = await res.json();
         const emails = json.data || [];
@@ -78,7 +85,7 @@ export function NotificationProvider({ children }) {
 
     const pollActivity = async () => {
       try {
-        const res = await fetch(`${API_BASE}/dashboard/activity?limit=5`);
+        const res = await fetch(`${API_BASE}/dashboard/activity?limit=5`, { headers: authHeaders() });
         if (!res.ok) return;
         const json = await res.json();
         const events = json.events || [];

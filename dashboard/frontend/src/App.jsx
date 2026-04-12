@@ -13,8 +13,10 @@ import BlacklistPage from './pages/BlacklistPage';
 import InboxPage from './pages/InboxPage';
 import OrdersPage from './pages/OrdersPage';
 import SelectSupplierPage from './pages/SelectSupplierPage';
+import UsersPage from './pages/UsersPage';
+import NewRequestPage from './pages/NewRequestPage';
+import BudgetPage from './pages/BudgetPage';
 import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
 import './App.css';
 
 const PAGE_TITLES = {
@@ -25,6 +27,9 @@ const PAGE_TITLES = {
   '/suppliers': 'Suppliers',
   '/blacklist': 'Blacklist',
   '/orders': 'Orders',
+  '/new-request': 'New Request',
+  '/budget': 'Budget',
+  '/users': 'Team Members',
 };
 
 function TopHeader() {
@@ -62,6 +67,9 @@ function DashboardLayout() {
             <Route path="/suppliers" element={<SuppliersPage />} />
             <Route path="/blacklist" element={<BlacklistPage />} />
             <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/new-request" element={<NewRequestPage />} />
+            <Route path="/budget" element={<BudgetPage />} />
+            <Route path="/users" element={<UsersPage />} />
           </Routes>
         </div>
       </main>
@@ -76,7 +84,6 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
           <Route path="/select/:requestId" element={<SelectSupplierPage />} />
           <Route path="*" element={
             <ProtectedRoute>

@@ -6,27 +6,34 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
+import bcrypt
 from jose import jwt
 
 from config import settings
 from db.models import Company, User
-from dashboard.api.deps import get_db
+from dashboard.api.deps import get_db, get_current_user
 
 router = APIRouter()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 ALGORITHM = "HS256"
 
 
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
+
+
 # ── Schemas ──────────────────────────────────────────────────────────────────
 
-class RegisterRequest(BaseModel):
+class CreateUserRequest(BaseModel):
     name: str
     email: str
     password: str
     department: str = ""
-    company_name: str
+    role: str = "employee"
 
 
 class LoginRequest(BaseModel):
@@ -62,44 +69,36 @@ def user_to_dict(user: User, company_name: str) -> dict:
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
-@router.post("/register")
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+@router.post("/users/create")
+def create_user(body: CreateUserRequest, db: Session = Depends(get_db), admin: User = Depends(get_current_user)):
+    if admin.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
     existing = db.query(User).filter_by(email=body.email.lower().strip()).first()
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    company = db.query(Company).filter_by(name=body.company_name.strip()).first()
-    if company:
-        role = "employee"
-    else:
-        company = Company(name=body.company_name.strip())
-        db.add(company)
-        db.flush()
-        role = "admin"
+    company = db.query(Company).filter_by(id=admin.company_id).first()
 
     user = User(
         name=body.name.strip(),
         email=body.email.lower().strip(),
-        hashed_password=pwd_context.hash(body.password),
+        hashed_password=hash_password(body.password),
         department=body.department.strip(),
-        role=role,
-        company_id=company.id,
+        role=body.role if body.role in ("admin", "employee") else "employee",
+        company_id=admin.company_id,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    return {
-        "access_token": create_token(user),
-        "token_type": "bearer",
-        "user": user_to_dict(user, company.name),
-    }
+    return user_to_dict(user, company.name if company else "")
 
 
 @router.post("/login")
 def login(body: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(email=body.email.lower().strip()).first()
-    if not user or not pwd_context.verify(body.password, user.hashed_password):
+    if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     company = db.query(Company).filter_by(id=user.company_id).first()

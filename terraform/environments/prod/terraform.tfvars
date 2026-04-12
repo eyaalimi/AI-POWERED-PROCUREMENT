@@ -11,6 +11,7 @@ ses_recipient_emails = ["test@procurement-ai.click"]
 gmail_address        = ""
 gmail_app_password   = ""
 tavily_api_key       = ""
+jwt_secret           = ""  # Set via TF_VAR_jwt_secret or terraform.tfvars.local
 
 # ── RDS (production settings) ─────────────────────────────────────────────
 rds_instance_class      = "db.t3.micro"     # Free Tier eligible (~$13/mo after)

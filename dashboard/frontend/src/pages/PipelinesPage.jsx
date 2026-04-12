@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useApi } from '../hooks/useApi';
+import { useApi, exportCsv } from '../hooks/useApi';
 import StageIndicator from '../components/StageIndicator';
-import { Search } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 
 export default function PipelinesPage() {
   const { data, loading, error } = useApi('/dashboard/pipelines', { interval: 10000 });
@@ -32,6 +32,9 @@ export default function PipelinesPage() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
+        <button onClick={() => exportCsv('/export/requests')} style={exportBtn}>
+          <Download size={15} /> Export CSV
+        </button>
       </div>
 
       <div className="table-wrapper">
@@ -115,3 +118,9 @@ export default function PipelinesPage() {
     </div>
   );
 }
+
+const exportBtn = {
+  display: 'flex', alignItems: 'center', gap: 6,
+  background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+  padding: '8px 14px', fontSize: 13, color: '#475569', cursor: 'pointer', fontWeight: 500,
+};

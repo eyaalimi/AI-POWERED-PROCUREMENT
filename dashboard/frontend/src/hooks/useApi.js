@@ -70,6 +70,25 @@ export async function apiDelete(path) {
   return res.json();
 }
 
+export function exportCsv(path) {
+  const token = localStorage.getItem('token');
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  fetch(`${API_BASE}${path}`, { headers })
+    .then(res => {
+      if (!res.ok) throw new Error('Export failed');
+      return res.blob();
+    })
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = path.split('/').pop() + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+}
+
 export async function apiPatch(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'PATCH',

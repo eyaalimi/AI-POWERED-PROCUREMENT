@@ -53,6 +53,12 @@ variable "tavily_api_key" {
   sensitive   = true
 }
 
+variable "jwt_secret" {
+  description = "Secret key for JWT token signing (dashboard auth)"
+  type        = string
+  sensitive   = true
+}
+
 # ── RDS ──────────────────────────────────────────────────────────────────────
 
 variable "rds_instance_class" {

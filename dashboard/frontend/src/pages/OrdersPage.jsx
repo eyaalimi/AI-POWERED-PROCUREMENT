@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useApi, apiPost, apiPatch } from '../hooks/useApi';
-import { Search } from 'lucide-react';
+import { useApi, apiPost, apiPatch, exportCsv } from '../hooks/useApi';
+import { Search, Download } from 'lucide-react';
 import KpiCard from '../components/KpiCard';
 import { Package, Truck, CheckCircle, Clock } from 'lucide-react';
 
@@ -93,6 +93,13 @@ export default function OrdersPage() {
           value={month}
           onChange={e => setMonth(e.target.value)}
         />
+        <button onClick={() => exportCsv('/export/orders')} style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+          padding: '8px 14px', fontSize: 13, color: '#475569', cursor: 'pointer', fontWeight: 500,
+        }}>
+          <Download size={15} /> Export CSV
+        </button>
       </div>
 
       <div className="table-wrapper">

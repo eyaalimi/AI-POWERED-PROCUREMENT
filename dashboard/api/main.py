@@ -20,7 +20,7 @@ from dashboard.api.auth import router as auth_router, user_to_dict
 from dashboard.api.deps import get_current_user, get_db
 from dashboard.api.routes import (
     kpis, pipelines, activity, suppliers, evaluations,
-    requests, emails, orders, dashboard_stats,
+    requests, emails, orders, dashboard_stats, budget, export,
 )
 
 app = FastAPI(
@@ -52,11 +52,28 @@ app.include_router(evaluations.router, prefix="/api/evaluations", tags=["Evaluat
 app.include_router(requests.router, prefix="/api/requests", tags=["Requests"])
 app.include_router(emails.router, prefix="/api/emails", tags=["Emails"])
 app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
+app.include_router(budget.router, prefix="/api/dashboard", tags=["Budget"])
+app.include_router(export.router, prefix="/api/export", tags=["Export"])
 
 
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/auth/users", tags=["Auth"])
+def list_users(
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    from db.models import Company, User
+    if current_user.role != "admin":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Admin access required")
+    users = db.query(User).filter_by(company_id=current_user.company_id).order_by(User.created_at).all()
+    company = db.query(Company).filter_by(id=current_user.company_id).first()
+    company_name = company.name if company else ""
+    return [user_to_dict(u, company_name) for u in users]
 
 
 @app.get("/api/auth/me", tags=["Auth"])
