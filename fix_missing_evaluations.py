@@ -6,7 +6,6 @@ Usage:
     python fix_missing_evaluations.py
 """
 import sys
-import uuid
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -88,9 +87,9 @@ def fix():
                     # Update status
                     req.status = "evaluation_sent"
                     session.commit()
-                    print(f"  Status updated to evaluation_sent")
+                    print("  Status updated to evaluation_sent")
                 else:
-                    print(f"  No scores returned from evaluation")
+                    print("  No scores returned from evaluation")
             except Exception as exc:
                 print(f"  ERROR: {exc}")
 

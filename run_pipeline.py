@@ -489,7 +489,7 @@ def process_email(raw_bytes: bytes, analysis_agent: AnalysisAgent, imap_conn=Non
                     if req_obj and req_obj.status not in ("evaluation_sent", "po_generated", "delivered"):
                         req_obj.status = "evaluation_sent"
                         _sess.commit()
-                        print(f"  [DB] Request status updated to 'evaluation_sent'")
+                        print("  [DB] Request status updated to 'evaluation_sent'")
             except Exception as exc:
                 import traceback
                 print(f"  [DB] Warning: post-pipeline sync failed: {exc}")

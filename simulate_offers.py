@@ -48,7 +48,7 @@ def inject_for_request(session, req):
     print(f"  Existing offers: {existing_offers}, evaluations: {existing_evals}")
 
     if existing_evals > 0:
-        print(f"  -> Already has evaluations, skipping.")
+        print("  -> Already has evaluations, skipping.")
         return
 
     budget_min = req.budget_min or 50
@@ -179,7 +179,7 @@ def inject_for_request(session, req):
     session.commit()
 
     print(f"  + {len(evaluations)} evaluations stored")
-    print(f"  -> Status updated to: evaluation_sent")
+    print("  -> Status updated to: evaluation_sent")
 
 
 def main():
@@ -203,7 +203,7 @@ def main():
             for req in requests:
                 inject_for_request(session, req)
 
-    print(f"\nDone! Refresh the dashboard to see the data.")
+    print("\nDone! Refresh the dashboard to see the data.")
 
 
 if __name__ == "__main__":
