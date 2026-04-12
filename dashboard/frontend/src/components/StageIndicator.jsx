@@ -1,11 +1,11 @@
 import { CheckCircle, Clock, AlertCircle, Circle } from 'lucide-react';
 
 const stageConfig = {
-  done: { icon: CheckCircle, color: '#27ae60', label: 'Done' },
-  active: { icon: Clock, color: '#f39c12', label: 'In progress' },
-  pending: { icon: Circle, color: '#95a5a6', label: 'Pending' },
-  error: { icon: AlertCircle, color: '#e74c3c', label: 'Error' },
-  skipped: { icon: Circle, color: '#bdc3c7', label: 'Skipped' },
+  done: { icon: CheckCircle, color: '#10b981', label: 'Done' },
+  active: { icon: Clock, color: '#f59e0b', label: 'In progress' },
+  pending: { icon: Circle, color: '#94a3b8', label: 'Pending' },
+  error: { icon: AlertCircle, color: '#ef4444', label: 'Error' },
+  skipped: { icon: Circle, color: '#cbd5e1', label: 'Skipped' },
 };
 
 export default function StageIndicator({ stages }) {

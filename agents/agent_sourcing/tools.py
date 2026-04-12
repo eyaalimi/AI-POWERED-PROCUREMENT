@@ -145,19 +145,26 @@ def search_existing_suppliers(product: str, category: str) -> str:
             product_lower = product.lower()
             category_lower = category.lower()
 
+            # Skip vague/generic categories that would match everything
+            VAGUE_CATEGORIES = {"other", "general", "misc", "miscellaneous", "n/a", ""}
+
             query = session.query(Supplier).filter(
                 Supplier.email.isnot(None),
                 Supplier.email != "",
             )
 
-            # Try category match first, then broader keyword search
-            results = query.filter(
-                func.lower(Supplier.category).contains(category_lower)
-            ).all()
+            results = []
+
+            # Only search by category if it's specific enough
+            if category_lower not in VAGUE_CATEGORIES:
+                results = query.filter(
+                    func.lower(Supplier.category).contains(category_lower)
+                ).all()
 
             if not results:
-                # Broader search: match any keyword from product in supplier category/name
-                keywords = [w for w in product_lower.split() if len(w) > 3]
+                # Search by product keywords in supplier category/name
+                # Use keywords from the product name (min 3 chars)
+                keywords = [w for w in product_lower.split() if len(w) >= 3]
                 if keywords:
                     conditions = []
                     for kw in keywords:

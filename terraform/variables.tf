@@ -19,7 +19,7 @@ variable "image_tag" {
 variable "bedrock_model_id" {
   description = "AWS Bedrock model ID for Claude"
   type        = string
-  default     = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+  default     = "arn:aws:bedrock:us-east-1:415529767461:inference-profile/global.amazon.nova-2-lite-v1:0"
 }
 
 variable "ses_recipient_emails" {
@@ -77,6 +77,14 @@ variable "rds_allowed_cidrs" {
   description = "CIDR blocks allowed to connect to RDS (Lambda IPs + dev machine)"
   type        = list(string)
   default     = ["0.0.0.0/0"]  # Restrict in prod to known IPs
+}
+
+# ── Dashboard / Domain ───────────────────────────────────────────────────────
+
+variable "domain_name" {
+  description = "Root domain for the dashboard (e.g. procurement-ai.click)"
+  type        = string
+  default     = "procurement-ai.click"
 }
 
 # ── Tags ─────────────────────────────────────────────────────────────────────

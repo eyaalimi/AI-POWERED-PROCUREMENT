@@ -41,6 +41,7 @@ module "procurement_agent" {
   gmail_app_password   = var.gmail_app_password
   tavily_api_key       = var.tavily_api_key
   log_level            = "INFO"
+  domain_name          = var.domain_name
 
   # RDS
   rds_instance_class      = var.rds_instance_class
@@ -71,7 +72,7 @@ variable "image_tag" {
 variable "bedrock_model_id" {
   description = "AWS Bedrock model ID"
   type        = string
-  default     = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+  default     = "arn:aws:bedrock:us-east-1:415529767461:inference-profile/global.amazon.nova-2-lite-v1:0"
 }
 
 variable "ses_recipient_emails" {
@@ -125,6 +126,12 @@ variable "rds_allowed_cidrs" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "domain_name" {
+  description = "Root domain for the dashboard"
+  type        = string
+  default     = "procurement-ai.click"
+}
+
 # ── Pass-through outputs ───────────────────────────────────────────────────────
 output "ecr_repository_url" {
   description = "ECR repository URL"
@@ -155,4 +162,14 @@ output "rds_database_url" {
   description = "PostgreSQL connection URL"
   value       = module.procurement_agent.rds_database_url
   sensitive   = true
+}
+
+output "frontend_url" {
+  description = "Dashboard URL"
+  value       = module.procurement_agent.frontend_url
+}
+
+output "api_url" {
+  description = "Dashboard API URL"
+  value       = module.procurement_agent.api_url
 }

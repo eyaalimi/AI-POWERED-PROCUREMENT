@@ -133,95 +133,36 @@ def fetch_supplier_replies(rfq_subject_prefix: str, received_after: str = "") ->
         Returns empty array if no replies found or IMAP fails.
     """
     if DRY_RUN:
-        logger.info("[DRY-RUN] Returning simulated supplier replies")
-        print(f"  [DRY-RUN] Simulating 5 supplier replies for: {rfq_subject_prefix}")
+        logger.info("[DRY-RUN] Returning simulated supplier reply")
+        print(f"  [DRY-RUN] Simulating 1 supplier reply for: {rfq_subject_prefix}")
         fake_replies = [
             {
-                "from_email": "ventes@cosmetiques-tunisia.tn",
+                "from_email": "ahmed@myreck.tn",
                 "subject": f"Re: {rfq_subject_prefix}",
                 "body": (
-                    "Bonjour,\n\n"
-                    "Suite à votre demande de devis, veuillez trouver notre offre :\n"
-                    "- Produit : L'Oréal Elseve Total Repair 5 Shampooing 250ml\n"
-                    "- Prix unitaire : 12.500 TND HT\n"
-                    "- Délai de livraison : 3 jours ouvrables\n"
-                    "- Garantie : Produit original, date d'expiration > 18 mois\n"
-                    "- Conditions de paiement : Net 30 jours\n"
-                    "- Livraison gratuite à partir de 100 unités\n"
-                    "- Distributeur agréé L'Oréal, certification ISO 9001\n\n"
-                    "Cordialement,\nKarim Ben Salah\nCosmétiques Tunisia SARL"
-                ),
-                "has_pdf": False,
-                "received_at": datetime.now(timezone.utc).isoformat(),
-            },
-            {
-                "from_email": "commercial@beaute-pro.tn",
-                "subject": f"Re: {rfq_subject_prefix}",
-                "body": (
-                    "Madame, Monsieur,\n\n"
-                    "Nous avons le plaisir de vous soumettre notre proposition :\n"
-                    "- Produit : L'Oréal Elseve Color-Vive Shampooing 250ml\n"
-                    "- Prix unitaire : 14.800 TND HT\n"
-                    "- Délai de livraison : 5 jours ouvrables\n"
-                    "- Garantie : Produit authentique, traçabilité complète\n"
-                    "- Conditions de paiement : 50% à la commande, solde à la livraison\n"
-                    "- Stock permanent : 2000+ unités\n"
-                    "- Certification RSE et emballage éco-responsable\n\n"
-                    "Restant à votre disposition,\nSonia Maalej\nBeauté Pro Distribution"
-                ),
-                "has_pdf": False,
-                "received_at": datetime.now(timezone.utc).isoformat(),
-            },
-            {
-                "from_email": "info@hygiene-express.tn",
-                "subject": f"Re: {rfq_subject_prefix}",
-                "body": (
-                    "Bonjour,\n\n"
-                    "En réponse à votre appel d'offres, voici notre meilleure proposition :\n"
-                    "- Produit : L'Oréal Elseve Arginine Resist x3 Shampooing 400ml\n"
-                    "- Prix unitaire : 18.900 TND HT\n"
-                    "- Délai de livraison : 7 jours ouvrables\n"
-                    "- Garantie : 2 ans avant expiration\n"
-                    "- Conditions de paiement : Net 45 jours\n"
-                    "- Format économique 400ml, meilleur rapport qualité/prix\n"
-                    "- Fournisseur certifié ISO 14001, engagement RSE\n\n"
-                    "Bien cordialement,\nAhmed Trabelsi\nHygiène Express"
-                ),
-                "has_pdf": False,
-                "received_at": datetime.now(timezone.utc).isoformat(),
-            },
-            {
-                "from_email": "devis@parapharma-direct.tn",
-                "subject": f"Re: {rfq_subject_prefix}",
-                "body": (
-                    "Bonjour,\n\n"
-                    "Merci pour votre consultation. Voici notre offre :\n"
-                    "- Produit : L'Oréal Elseve Huile Extraordinaire Shampooing 250ml\n"
-                    "- Prix unitaire : 16.200 TND HT\n"
-                    "- Délai de livraison : 10 jours ouvrables\n"
-                    "- Garantie : Produit original sous scellé\n"
-                    "- Conditions de paiement : Net 30 jours\n"
-                    "- Gamme premium, forte demande client\n"
-                    "- Pas de certification RSE\n\n"
-                    "Cordialement,\nMehdi Gharbi\nParaPharma Direct"
-                ),
-                "has_pdf": False,
-                "received_at": datetime.now(timezone.utc).isoformat(),
-            },
-            {
-                "from_email": "contact@soins-sahara.tn",
-                "subject": f"Re: {rfq_subject_prefix}",
-                "body": (
-                    "Bonjour,\n\n"
-                    "Nous vous remercions pour votre consultation. Notre offre :\n"
-                    "- Produit : L'Oréal Elseve Dream Long Shampooing 250ml\n"
-                    "- Prix unitaire : 13.500 TND HT\n"
-                    "- Délai de livraison : 14 jours\n"
-                    "- Garantie : Produit certifié, lot traçable\n"
-                    "- Conditions de paiement : Net 60 jours\n"
-                    "- Grossiste agréé, prix dégressif dès 200 unités\n"
-                    "- Fournisseur certifié ISO 14001 (RSE)\n\n"
-                    "Cordialement,\nFatma Bouazizi\nSoins Sahara Distribution"
+                    "Dear Sir/Madam,\n\n"
+                    "Thank you for your inquiry and the opportunity to submit our quotation "
+                    "for your IT equipment requirements.\n\n"
+                    "We are pleased to provide our offer as follows:\n\n"
+                    "Product Details:\n"
+                    "- Product: Lenovo ThinkPad i5 Laptop (14-inch display)\n"
+                    "- Category: IT Equipment\n"
+                    "- Quantity: 1 Unit\n\n"
+                    "Pricing:\n"
+                    "- Unit Price: 3 499,000 DT\n"
+                    "- Total Price: 3 499,000 DT (for 1 unit, inclusive of VAT)\n\n"
+                    "Delivery & Shipping:\n"
+                    "- Estimated Delivery Time: 7-10 business days from order confirmation\n"
+                    "- Delivery Method: Standard courier service\n"
+                    "- Delivery Date: On or before April 30, 2026\n\n"
+                    "Warranty:\n"
+                    "- Standard Manufacturer Warranty: 1 year (covering hardware defects)\n"
+                    "- Optional extended warranty available upon request\n\n"
+                    "Payment Terms:\n"
+                    "- Payment Method: Cash\n"
+                    "- Payment Terms: 50% advance upon order confirmation, 50% upon delivery\n\n"
+                    "This quotation is valid for 7 days and subject to stock availability.\n\n"
+                    "Best regards,\nAhmed\nmyreck"
                 ),
                 "has_pdf": False,
                 "received_at": datetime.now(timezone.utc).isoformat(),
@@ -252,7 +193,10 @@ def fetch_supplier_replies(rfq_subject_prefix: str, received_after: str = "") ->
                 if word.isascii() and len(word) > 2 and word.isalpha():
                     simple_keyword = word
                     break
-        # Build IMAP SINCE filter — use received_after date or today as minimum
+        # Build IMAP SINCE filter — always use start-of-day for the date filter.
+        # The received_after param is used ONLY for the post-fetch time check,
+        # but we clamp it to start-of-day to avoid filtering out recent replies
+        # (the LLM sometimes passes "now" which rejects everything).
         since_dt = None
         if received_after:
             try:
@@ -260,12 +204,19 @@ def fetch_supplier_replies(rfq_subject_prefix: str, received_after: str = "") ->
             except Exception:
                 pass
         if since_dt is None:
-            since_dt = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+            since_dt = datetime.now(timezone.utc)
+        # Clamp: never more recent than 2 hours ago to avoid rejecting fresh replies
+        from datetime import timedelta
+        max_since = datetime.now(timezone.utc) - timedelta(hours=2)
+        if since_dt > max_since:
+            since_dt = max_since
         imap_since = since_dt.strftime("%d-%b-%Y")
         search_query = f'(SUBJECT "{simple_keyword}" SINCE "{imap_since}")'
 
+        print(f"  [IMAP DEBUG] Search query: {search_query}")
         _, msg_nums = conn.search(None, search_query)
         ids = msg_nums[0].split()
+        print(f"  [IMAP DEBUG] Found {len(ids)} email(s) matching query")
 
         replies = []
         for num in ids:
@@ -274,8 +225,11 @@ def fetch_supplier_replies(rfq_subject_prefix: str, received_after: str = "") ->
             msg = email_lib.message_from_bytes(raw)
 
             from_addr = msg.get("From", "")
+            subject = msg.get("Subject", "")
+            print(f"  [IMAP DEBUG] Email from: {from_addr} | subject: {subject}")
             # Skip our own sent messages
             if settings.gmail_address.lower() in from_addr.lower():
+                print(f"  [IMAP DEBUG] -> Skipped (own email)")
                 continue
 
             # Extract body text and PDF attachments
@@ -326,13 +280,25 @@ def fetch_supplier_replies(rfq_subject_prefix: str, received_after: str = "") ->
                     if msg_dt.tzinfo is None:
                         msg_dt = msg_dt.replace(tzinfo=timezone.utc)
                     if msg_dt < since_dt:
+                        print(f"  [IMAP DEBUG] -> Skipped (too old: {msg_dt} < {since_dt})")
                         continue
                 except Exception:
                     pass
 
+            # Post-fetch subject filter: verify the reply actually matches
+            # the requested RFQ product, not just any RFQ email
+            if rfq_subject_prefix:
+                decoded_subject = str(subject).lower()
+                prefix_lower = rfq_subject_prefix.lower()
+                # Check that the product name words appear in the subject
+                product_words = [w for w in prefix_lower.replace("rfq", "").replace("—", "").split() if len(w) > 2]
+                if product_words and not any(w in decoded_subject for w in product_words):
+                    print(f"  [IMAP DEBUG] -> Skipped (subject mismatch: looking for {product_words})")
+                    continue
+
             replies.append({
                 "from_email": sender_email.strip(),
-                "subject": msg.get("Subject", ""),
+                "subject": subject,
                 "body": full_body[:5000],
                 "has_pdf": len(pdf_texts) > 0,
                 "received_at": received_at_raw,

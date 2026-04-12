@@ -6,10 +6,11 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column, String, Float, Integer, Boolean, Text, DateTime, ForeignKey,
-    create_engine,
+    create_engine, Enum as SAEnum,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+import enum
 
 from config import settings
 
@@ -18,6 +19,38 @@ Base = declarative_base()
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+
+# ── Auth Tables ──────────────────────────────────────────────────────────────
+
+class UserRole(str, enum.Enum):
+    admin = "admin"
+    employee = "employee"
+
+
+class Company(Base):
+    __tablename__ = "companies"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(255), unique=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+
+    users = relationship("User", back_populates="company")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(255), nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
+    hashed_password = Column(String(255), nullable=False)
+    department = Column(String(100))
+    role = Column(String(20), default="employee")
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+
+    company = relationship("Company", back_populates="users")
 
 
 # ── Tables ───────────────────────────────────────────────────────────────────
@@ -37,6 +70,8 @@ class ProcurementRequest(Base):
     is_valid = Column(Boolean, default=True)
     rejection_reason = Column(Text)
     status = Column(String(50), default="pending")
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=True)
+    created_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     suppliers = relationship("Supplier", back_populates="request", cascade="all, delete-orphan")
@@ -157,6 +192,7 @@ class SupplierBlacklist(Base):
     supplier_email = Column(String(255))
     reason = Column(Text, nullable=False)
     blacklisted_by = Column(String(255), default="admin")
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
 
@@ -172,6 +208,38 @@ class PipelineEvent(Base):
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     request = relationship("ProcurementRequest", backref="events")
+
+
+class PurchaseOrder(Base):
+    __tablename__ = "purchase_orders"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id = Column(UUID(as_uuid=True), ForeignKey("procurement_requests.id"), nullable=False)
+    evaluation_id = Column(UUID(as_uuid=True), ForeignKey("evaluations.id"), nullable=False)
+    po_reference = Column(String(50), unique=True, nullable=False)
+    supplier_name = Column(String(255), nullable=False)
+    supplier_email = Column(String(255))
+    product = Column(Text, nullable=False)
+    quantity = Column(Float)
+    unit = Column(String(50))
+    unit_price = Column(Float)
+    total_price = Column(Float)
+    currency = Column(String(10), default="TND")
+    delivery_address = Column(Text)
+    cost_center = Column(String(100))
+    department = Column(String(100))
+    requester_name = Column(String(255))
+    requester_email = Column(String(255))
+    notes = Column(Text)
+    company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=True)
+    delivery_status = Column(String(50), default="awaiting_delivery")
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+    confirmed_by = Column(String(255), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    request = relationship("ProcurementRequest", backref="purchase_orders")
+    evaluation = relationship("Evaluation", backref="purchase_order")
 
 
 # ── Engine & Session ─────────────────────────────────────────────────────────

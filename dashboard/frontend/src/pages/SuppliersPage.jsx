@@ -1,45 +1,66 @@
+import { useState } from 'react';
 import { useApi } from '../hooks/useApi';
+import { Search } from 'lucide-react';
 
 export default function SuppliersPage() {
   const { data, loading, error } = useApi('/suppliers', { interval: 15000 });
+  const [search, setSearch] = useState('');
 
-  if (loading) return <div className="page-loading">Chargement...</div>;
-  if (error) return <div className="page-error">Erreur: {error}</div>;
+  if (loading) return <div className="page-loading">Loading suppliers...</div>;
+  if (error) return <div className="page-error">Error: {error}</div>;
 
-  const suppliers = data?.suppliers || [];
+  let suppliers = data?.suppliers || [];
+  if (search) {
+    const q = search.toLowerCase();
+    suppliers = suppliers.filter(s =>
+      (s.name || '').toLowerCase().includes(q) || (s.email || '').toLowerCase().includes(q)
+    );
+  }
 
   return (
     <div className="page">
-      <h1>Fournisseurs</h1>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+        <div className="search-wrapper" style={{ flex: 1 }}>
+          <Search size={16} />
+          <input
+            type="text"
+            placeholder="Search suppliers..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
 
       <div className="table-wrapper">
         <table className="data-table">
           <thead>
             <tr>
-              <th>Nom</th>
+              <th>Supplier</th>
               <th>Email</th>
-              <th>Score QCDP Moyen</th>
-              <th>Taux de Reponse</th>
-              <th>Offres</th>
+              <th>Avg QCDP Score</th>
+              <th>Response Rate</th>
+              <th>Offers</th>
             </tr>
           </thead>
           <tbody>
             {suppliers.map((s, i) => (
               <tr key={i}>
                 <td className="td-title">{s.name}</td>
-                <td>{s.email || '—'}</td>
+                <td style={{ color: '#6366f1' }}>{s.email || '—'}</td>
                 <td>
                   <div className="score-bar">
-                    <div className="score-fill" style={{ width: `${(s.avg_score || 0)}%`, backgroundColor: scoreColor(s.avg_score) }} />
+                    <div style={{ width: 80, height: 6, borderRadius: 3, background: '#f1f5f9', overflow: 'hidden' }}>
+                      <div className="score-fill" style={{ width: `${(s.avg_score || 0)}%`, backgroundColor: scoreColor(s.avg_score) }} />
+                    </div>
                     <span>{s.avg_score?.toFixed(1) || '—'}</span>
                   </div>
                 </td>
-                <td>{s.response_rate != null ? `${s.response_rate}%` : '—'}</td>
+                <td style={{ fontWeight: 500 }}>{s.response_rate != null ? `${s.response_rate}%` : '—'}</td>
                 <td>{s.total_offers ?? '—'}</td>
               </tr>
             ))}
             {suppliers.length === 0 && (
-              <tr><td colSpan={5} className="empty-row">Aucun fournisseur</td></tr>
+              <tr><td colSpan={5} className="empty-row">No suppliers found</td></tr>
             )}
           </tbody>
         </table>
@@ -49,8 +70,8 @@ export default function SuppliersPage() {
 }
 
 function scoreColor(score) {
-  if (!score) return '#95a5a6';
-  if (score >= 75) return '#27ae60';
-  if (score >= 50) return '#f39c12';
-  return '#e74c3c';
+  if (!score) return '#94a3b8';
+  if (score >= 75) return '#10b981';
+  if (score >= 50) return '#f59e0b';
+  return '#ef4444';
 }

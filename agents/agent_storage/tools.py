@@ -221,11 +221,36 @@ class StorageTools:
         session = self._session()
         try:
             req_uuid = uuid.UUID(request_id)
+            # Build a lookup: supplier_email -> offer_id
+            offers = session.query(Offer).filter_by(request_id=req_uuid).all()
+            email_to_offer = {}
+            for o in offers:
+                sup = session.query(Supplier).filter_by(id=o.supplier_id).first()
+                if sup and sup.email:
+                    email_to_offer[sup.email.lower()] = o.id
+                if sup and sup.name:
+                    email_to_offer[sup.name.lower()] = o.id
+            # Fallback: use the first offer if only one exists
+            fallback_offer_id = offers[0].id if len(offers) == 1 else None
+
             result = []
             for s in evaluation_scores:
+                supplier_email = s.get("supplier_email", "").lower()
+                supplier_name = s.get("supplier_name", "").lower()
+                offer_id = (
+                    s.get("offer_id")
+                    or email_to_offer.get(supplier_email)
+                    or email_to_offer.get(supplier_name)
+                    or fallback_offer_id
+                )
+                if not offer_id:
+                    logger.warning("No offer_id found for evaluation",
+                                   extra={"supplier": s.get("supplier_name"), "email": supplier_email})
+                    continue
+
                 eval_record = Evaluation(
                     request_id=req_uuid,
-                    offer_id=None,
+                    offer_id=offer_id,
                     supplier_name=s.get("supplier_name", ""),
                     supplier_email=s.get("supplier_email", ""),
                     price_score=s.get("price_score"),

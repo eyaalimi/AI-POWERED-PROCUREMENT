@@ -123,6 +123,7 @@ class AnalysisAgent:
         model = BedrockModel(
             model_id=settings.bedrock_model_id,
             region_name=settings.aws_region,
+            max_tokens=4096,
         )
         self._agent = Agent(
             model=model,

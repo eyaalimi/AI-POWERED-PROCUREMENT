@@ -11,6 +11,7 @@ Usage:
 """
 import argparse
 import imaplib
+import os
 import sys
 import time
 from dataclasses import asdict
@@ -45,6 +46,38 @@ OUTPUT_DIR = PROJECT_ROOT / "outputs"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 
+def _store_evals_from_report(request_id: str, report_path: str):
+    """
+    Fallback: re-read the evaluation JSON output and store evaluations to DB.
+    This handles cases where the LLM orchestrator failed to persist evaluations.
+    """
+    import glob
+    import json as _json
+
+    # Find the most recent evaluation JSON
+    eval_files = sorted(
+        glob.glob(str(OUTPUT_DIR / "evaluation_*.json")),
+        key=lambda f: Path(f).stat().st_mtime,
+        reverse=True,
+    )
+    if not eval_files:
+        print("  [DB] No evaluation JSON found to recover from")
+        return
+
+    with open(eval_files[0], "r", encoding="utf-8") as f:
+        eval_data = _json.load(f)
+
+    scores = eval_data.get("scores", [])
+    if not scores:
+        print("  [DB] Evaluation JSON has no scores")
+        return
+
+    from agents.agent_storage.agent import StorageAgent
+    storage = StorageAgent()
+    storage.store_evaluations(request_id, scores, report_path)
+    print(f"  [DB] {len(scores)} evaluation(s) recovered and stored")
+
+
 def print_banner():
     print("\n" + "=" * 60)
     print("  PROCUREMENT PIPELINE — FULL E2E MODE")
@@ -68,21 +101,23 @@ def print_result(result):
     print("=" * 60 + "\n")
 
 
-def send_report_to_requester(requester_email: str, product: str, report_path: str, best_offer: str):
+def send_report_to_requester(requester_email: str, product: str, report_path: str, best_offer: str, request_id: str = None):
     """Send the evaluation PDF to the requester and ask for their decision."""
     from email_gateway.sender import EmailSender
+
+    dashboard_url = os.environ.get("DASHBOARD_URL", "https://procurement-ai.click")
+    select_link = f"\n📊 View Report & Select Supplier:\n{dashboard_url}/select/{request_id}\n\n" if request_id else "\n"
 
     subject = f"Evaluation Report — {product}"
     body = (
         "Hello,\n\n"
-        f"Please find attached the supplier evaluation report for: {product}.\n\n"
-        f"Our recommendation is: {best_offer}\n\n"
-        "Each supplier's contact email is included in the report "
-        "so you can place your order directly.\n\n"
-        "If you are not satisfied with these results, simply reply "
-        '"RELAUNCH" to this email and we will search for new suppliers.\n\n'
-        "If the report suits you, no reply is needed — "
-        "you can contact the supplier of your choice directly.\n\n"
+        f"Your supplier evaluation report for \"{product}\" is ready.\n\n"
+        f"Our recommendation is: {best_offer}\n"
+        f"{select_link}"
+        "You can:\n"
+        "• Click the link above to view detailed comparisons and place your order\n"
+        "• Reply \"RELAUNCH\" to this email for a new search\n\n"
+        "Please find the detailed PDF report attached.\n\n"
         "Regards,\nProcurement AI Team"
     )
 
@@ -214,35 +249,52 @@ def _wait_and_recheck_offers(imap_conn, initial_result, spec, requester, attachm
             if request_id:
                 try:
                     from agents.agent_storage.agent import StorageAgent
+                    from db.models import Supplier as SupplierModel, RFQ as RFQModel, get_session_factory
+                    import uuid as _uuid
                     storage = StorageAgent()
 
+                    # Build supplier_map and rfq_map from DB
+                    _S = get_session_factory()
+                    supplier_map = {}
+                    rfq_map = {}
+                    with _S() as _sess:
+                        _rid = _uuid.UUID(request_id) if isinstance(request_id, str) else request_id
+                        for sup in _sess.query(SupplierModel).filter_by(request_id=_rid).all():
+                            if sup.email:
+                                supplier_map[sup.email] = str(sup.id)
+                        for rfq in _sess.query(RFQModel).filter_by(request_id=_rid).all():
+                            sup = _sess.query(SupplierModel).filter_by(id=rfq.supplier_id).first()
+                            if sup and sup.email:
+                                rfq_map[sup.email] = str(rfq.id)
+                    print(f"  [DB] Maps: suppliers={supplier_map}, rfqs={rfq_map}")
+
                     # Store offers
-                    storage.store_offers(request_id, offer_dicts, {}, {})
+                    storage.store_offers(request_id, offer_dicts, supplier_map, rfq_map)
                     print(f"  [DB] {len(offer_dicts)} offer(s) stored")
 
                     # Store evaluation scores
-                    if hasattr(eval_result, "scores") and eval_result.scores:
-                        scores = eval_result.scores
-                    elif hasattr(eval_result, "ranking") and eval_result.ranking:
-                        scores = eval_result.ranking
-                    else:
-                        scores = []
+                    scores = getattr(eval_result, "scores", None) or getattr(eval_result, "ranking", None) or []
+                    print(f"  [DB] eval_result type={type(eval_result).__name__}, scores count={len(scores)}")
                     if scores:
                         score_dicts = []
                         for s in scores:
                             score_dicts.append(asdict(s) if hasattr(s, "__dataclass_fields__") else s)
-                        storage.store_evaluations(request_id, score_dicts, getattr(eval_result, "report_path", None))
+                        report_path = getattr(eval_result, "report_path", None)
+                        req_id_str = str(request_id) if not isinstance(request_id, str) else request_id
+                        storage.store_evaluations(req_id_str, score_dicts, report_path)
                         print(f"  [DB] {len(score_dicts)} evaluation(s) stored")
+                    else:
+                        print(f"  [DB] WARNING: No scores in eval_result! attrs={dir(eval_result)}")
 
-                    # Update request status to completed
+                    # Update request status to evaluation_sent
                     from db.models import ProcurementRequest, get_session_factory
                     Session = get_session_factory()
                     with Session() as session:
                         req = session.query(ProcurementRequest).filter_by(id=request_id).first()
                         if req:
-                            req.status = "completed"
+                            req.status = "evaluation_sent"
                             session.commit()
-                            print("  [DB] Request status updated to 'completed'")
+                            print("  [DB] Request status updated to 'evaluation_sent'")
                 except Exception as e:
                     print(f"  [DB] Warning: could not persist B2 results: {e}")
 
@@ -364,7 +416,9 @@ def process_email(raw_bytes: bytes, analysis_agent: AnalysisAgent, imap_conn=Non
 
         needs_wait = (
             result.status == "awaiting_responses"
-            or (actual_offers == 0 and result.rfqs_sent > 0 and result.status not in ("rejected", "failed"))
+            or (actual_offers == 0 and actual_evals == 0
+                and result.status not in ("rejected", "failed")
+                and result.product)  # has a valid product = RFQs were likely sent
         )
         print(f"\n  [DEBUG] status={result.status} rfqs_sent={result.rfqs_sent} "
               f"offers_in_db={actual_offers} evals_in_db={actual_evals} needs_wait={needs_wait} "
@@ -374,6 +428,72 @@ def process_email(raw_bytes: bytes, analysis_agent: AnalysisAgent, imap_conn=Non
             result = _wait_and_recheck_offers(
                 imap_conn, result, spec, requester, attachment_text, excluded_suppliers,
             )
+
+        # ── Post-pipeline: ensure evaluations are persisted & status updated ──
+        if result.request_id and result.status == "completed":
+            try:
+                from db.models import Evaluation as EvalModel, Offer as OfferModel, Supplier as SupplierModel
+                from db.models import ProcurementRequest, get_session_factory
+                from agents.agent_storage.agent import StorageAgent
+                import uuid as _uuid
+                _S = get_session_factory()
+                with _S() as _sess:
+                    _rid = _uuid.UUID(result.request_id)
+                    eval_count = _sess.query(EvalModel).filter_by(request_id=_rid).count()
+                    if eval_count == 0:
+                        print("  [DB] Evaluations missing — attempting recovery...")
+                        # Try 1: recover from evaluation JSON file
+                        if result.report_path:
+                            _store_evals_from_report(result.request_id, result.report_path)
+                            eval_count = _sess.query(EvalModel).filter_by(request_id=_rid).count()
+
+                        # Try 2: if still no evals, re-run evaluation on DB offers
+                        if eval_count == 0:
+                            offers_db = _sess.query(OfferModel).filter_by(request_id=_rid).all()
+                            if offers_db:
+                                print(f"  [DB] Re-running evaluation on {len(offers_db)} offer(s)...")
+                                from dataclasses import asdict as _asdict
+                                from agents.agent_evaluation.agent import EvaluationAgent
+                                offer_dicts = []
+                                for o in offers_db:
+                                    sup = _sess.query(SupplierModel).filter_by(id=o.supplier_id).first()
+                                    offer_dicts.append({
+                                        "supplier_name": sup.name if sup else "Unknown",
+                                        "supplier_email": sup.email if sup else "",
+                                        "unit_price": o.unit_price,
+                                        "total_price": o.total_price,
+                                        "currency": o.currency or "TND",
+                                        "delivery_days": o.delivery_days,
+                                        "warranty": o.warranty,
+                                        "payment_terms": o.payment_terms,
+                                        "notes": o.notes,
+                                    })
+                                req_obj = _sess.query(ProcurementRequest).filter_by(id=_rid).first()
+                                spec_dict = {
+                                    "product": req_obj.product if req_obj else result.product,
+                                    "quantity": req_obj.quantity if req_obj else None,
+                                    "budget_min": req_obj.budget_min if req_obj else None,
+                                    "budget_max": req_obj.budget_max if req_obj else None,
+                                }
+                                eval_agent = EvaluationAgent()
+                                eval_res = eval_agent.evaluate(offer_dicts, spec_dict)
+                                scores = getattr(eval_res, "scores", []) or getattr(eval_res, "ranking", [])
+                                if scores:
+                                    score_dicts = [_asdict(s) if hasattr(s, "__dataclass_fields__") else s for s in scores]
+                                    storage = StorageAgent()
+                                    storage.store_evaluations(result.request_id, score_dicts, getattr(eval_res, "report_path", None))
+                                    print(f"  [DB] {len(score_dicts)} evaluation(s) stored via re-evaluation")
+
+                    # Update status to evaluation_sent
+                    req_obj = _sess.query(ProcurementRequest).filter_by(id=_rid).first()
+                    if req_obj and req_obj.status not in ("evaluation_sent", "po_generated", "delivered"):
+                        req_obj.status = "evaluation_sent"
+                        _sess.commit()
+                        print(f"  [DB] Request status updated to 'evaluation_sent'")
+            except Exception as exc:
+                import traceback
+                print(f"  [DB] Warning: post-pipeline sync failed: {exc}")
+                traceback.print_exc()
 
         print_result(result)
 
@@ -390,6 +510,7 @@ def process_email(raw_bytes: bytes, analysis_agent: AnalysisAgent, imap_conn=Non
                 product=result.product,
                 report_path=result.report_path,
                 best_offer=result.best_offer or "N/A",
+                request_id=result.request_id,
             )
             print(f"  Report sent to {requester}")
         except Exception as exc:
@@ -528,7 +649,73 @@ def run_cli_mode():
             except Exception:
                 pass
 
+    # ── Post-pipeline: ensure evaluations are persisted ──
+    if result.request_id and result.status == "completed":
+        try:
+            from db.models import Evaluation as EvalModel, Offer as OfferModel, Supplier as SupplierModel
+            from db.models import ProcurementRequest, get_session_factory
+            from agents.agent_storage.agent import StorageAgent
+            import uuid as _uuid
+            _S = get_session_factory()
+            with _S() as _sess:
+                _rid = _uuid.UUID(result.request_id)
+                eval_count = _sess.query(EvalModel).filter_by(request_id=_rid).count()
+                if eval_count == 0 and result.report_path:
+                    _store_evals_from_report(result.request_id, result.report_path)
+                    eval_count = _sess.query(EvalModel).filter_by(request_id=_rid).count()
+                if eval_count == 0:
+                    offers_db = _sess.query(OfferModel).filter_by(request_id=_rid).all()
+                    if offers_db:
+                        print(f"  [DB] Re-running evaluation on {len(offers_db)} offer(s)...")
+                        from agents.agent_evaluation.agent import EvaluationAgent
+                        from dataclasses import asdict as _asdict
+                        offer_dicts = []
+                        for o in offers_db:
+                            sup = _sess.query(SupplierModel).filter_by(id=o.supplier_id).first()
+                            offer_dicts.append({
+                                "supplier_name": sup.name if sup else "Unknown",
+                                "supplier_email": sup.email if sup else "",
+                                "unit_price": o.unit_price, "total_price": o.total_price,
+                                "currency": o.currency or "TND", "delivery_days": o.delivery_days,
+                                "warranty": o.warranty, "payment_terms": o.payment_terms,
+                            })
+                        req_obj = _sess.query(ProcurementRequest).filter_by(id=_rid).first()
+                        spec_d = {"product": req_obj.product if req_obj else result.product,
+                                  "quantity": req_obj.quantity if req_obj else None,
+                                  "budget_min": req_obj.budget_min if req_obj else None,
+                                  "budget_max": req_obj.budget_max if req_obj else None}
+                        eval_agent_cli = EvaluationAgent()
+                        eval_res = eval_agent_cli.evaluate(offer_dicts, spec_d)
+                        scores = getattr(eval_res, "scores", []) or []
+                        if scores:
+                            sd = [_asdict(s) if hasattr(s, "__dataclass_fields__") else s for s in scores]
+                            StorageAgent().store_evaluations(result.request_id, sd, getattr(eval_res, "report_path", None))
+                            print(f"  [DB] {len(sd)} evaluation(s) stored")
+                            if not result.report_path:
+                                result = result._replace(report_path=getattr(eval_res, "report_path", None)) if hasattr(result, "_replace") else result
+                req_obj = _sess.query(ProcurementRequest).filter_by(id=_rid).first()
+                if req_obj and req_obj.status not in ("evaluation_sent", "po_generated", "delivered"):
+                    req_obj.status = "evaluation_sent"
+                    _sess.commit()
+        except Exception as exc:
+            print(f"  [DB] Warning: post-pipeline sync failed: {exc}")
+
     print_result(result)
+
+    # ── Send PDF report to requester ─────────────────────────
+    if result.report_path and result.status == "completed":
+        print("[Decision] Sending evaluation report to requester...")
+        try:
+            send_report_to_requester(
+                requester_email=requester,
+                product=result.product,
+                report_path=result.report_path,
+                best_offer=result.best_offer or "N/A",
+                request_id=result.request_id,
+            )
+            print(f"  Report sent to {requester}")
+        except Exception as exc:
+            print(f"  Failed to send report: {exc}")
 
 
 def main():

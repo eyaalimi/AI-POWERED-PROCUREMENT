@@ -8,7 +8,7 @@ aws_region   = "us-east-1"   # Change to your SES region (e.g. eu-west-1)
 project_name = "procurement-agent"
 image_tag    = "latest"
 
-bedrock_model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+bedrock_model_id = "arn:aws:bedrock:us-east-1:415529767461:inference-profile/global.amazon.nova-2-lite-v1:0"
 
 # Emails that SES will process — must be on a domain verified in SES
 ses_recipient_emails = ["procurement@yourdomain.com"]
@@ -21,3 +21,6 @@ gmail_app_password = "your16charapppassword"  # No spaces
 database_url = ""
 
 log_level = "INFO"
+
+# Domain for dashboard (must have Route53 hosted zone)
+domain_name = "procurement-ai.click"

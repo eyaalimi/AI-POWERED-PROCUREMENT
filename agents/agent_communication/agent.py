@@ -261,6 +261,7 @@ class CommunicationAgent:
         model = BedrockModel(
             model_id=settings.bedrock_model_id,
             region_name=settings.aws_region,
+            max_tokens=4096,
         )
         # Separate agent instances for each phase (different system prompts)
         self._rfq_agent = Agent(

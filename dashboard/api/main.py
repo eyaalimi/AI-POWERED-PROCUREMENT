@@ -14,7 +14,12 @@ if str(PROJECT_ROOT) not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from dashboard.api.routes import kpis, pipelines, activity, suppliers, evaluations
+from dashboard.api.auth import router as auth_router, user_to_dict
+from dashboard.api.deps import get_current_user, get_db
+from dashboard.api.routes import (
+    kpis, pipelines, activity, suppliers, evaluations,
+    requests, emails, orders, dashboard_stats,
+)
 
 app = FastAPI(
     title="Procurement AI Dashboard",
@@ -24,19 +29,47 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://procurement-ai.click",
+        "https://www.procurement-ai.click",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth_router, prefix="/api/auth", tags=["Auth"])
 app.include_router(kpis.router, prefix="/api/dashboard", tags=["KPIs"])
 app.include_router(pipelines.router, prefix="/api/dashboard", tags=["Pipelines"])
 app.include_router(activity.router, prefix="/api/dashboard", tags=["Activity"])
+app.include_router(dashboard_stats.router, prefix="/api/dashboard", tags=["Dashboard Stats"])
 app.include_router(suppliers.router, prefix="/api/suppliers", tags=["Suppliers"])
 app.include_router(evaluations.router, prefix="/api/evaluations", tags=["Evaluations"])
+app.include_router(requests.router, prefix="/api/requests", tags=["Requests"])
+app.include_router(emails.router, prefix="/api/emails", tags=["Emails"])
+app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
 
 
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/auth/me", tags=["Auth"])
+def get_me(
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    from db.models import Company
+    company = db.query(Company).filter_by(id=current_user.company_id).first()
+    return user_to_dict(current_user, company.name if company else "")
+
+
+# ── Lambda handler (via Mangum) ──────────────────────────────────────────────
+try:
+    from mangum import Mangum
+    handler = Mangum(app, lifespan="off")
+except ImportError:
+    handler = None  # local dev — Mangum not needed
