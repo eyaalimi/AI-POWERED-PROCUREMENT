@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Column, String, Float, Integer, Boolean, Text, DateTime, ForeignKey,
-    create_engine, Enum as SAEnum,
+    create_engine,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker

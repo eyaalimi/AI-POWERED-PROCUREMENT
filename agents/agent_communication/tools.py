@@ -229,7 +229,7 @@ def fetch_supplier_replies(rfq_subject_prefix: str, received_after: str = "") ->
             print(f"  [IMAP DEBUG] Email from: {from_addr} | subject: {subject}")
             # Skip our own sent messages
             if settings.gmail_address.lower() in from_addr.lower():
-                print(f"  [IMAP DEBUG] -> Skipped (own email)")
+                print("  [IMAP DEBUG] -> Skipped (own email)")
                 continue
 
             # Extract body text and PDF attachments

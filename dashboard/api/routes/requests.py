@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, extract
 
 from db.models import (
-    ProcurementRequest, Supplier, RFQ, Offer, Evaluation, PipelineEvent, User,
+    ProcurementRequest, Supplier, Offer, Evaluation, PipelineEvent, User,
 )
 from dashboard.api.deps import get_db, get_current_user
 

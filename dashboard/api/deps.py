@@ -9,13 +9,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 
 from config import settings
-from db.models import get_engine, get_session_factory, create_tables, User, Company
+from db.models import get_engine, get_session_factory, create_tables, User
 
 _engine = get_engine()
 create_tables(_engine)

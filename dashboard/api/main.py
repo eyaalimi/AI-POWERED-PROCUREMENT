@@ -14,6 +14,8 @@ if str(PROJECT_ROOT) not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi import Depends
+
 from dashboard.api.auth import router as auth_router, user_to_dict
 from dashboard.api.deps import get_current_user, get_db
 from dashboard.api.routes import (
