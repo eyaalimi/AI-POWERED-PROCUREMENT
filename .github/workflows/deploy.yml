@@ -116,11 +116,20 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Get API URL
+        id: api-url
+        run: |
+          API_URL=$(aws apigatewayv2 get-apis --region $AWS_REGION \
+            --query "Items[?Name=='procurement-agent-prod-dashboard-api'].ApiEndpoint" \
+            --output text)
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+          echo "Dashboard API URL: $API_URL"
+
       - name: Build & deploy frontend
         run: |
           cd dashboard/frontend
           npm ci
-          npm run build
+          VITE_API_BASE=${{ steps.api-url.outputs.api_url }}/api npm run build
           aws s3 sync dist/ s3://$FRONTEND_BUCKET/ --delete --cache-control "public, max-age=31536000"
           aws s3 cp dist/index.html s3://$FRONTEND_BUCKET/index.html --cache-control "public, max-age=60"
 
