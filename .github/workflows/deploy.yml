@@ -78,9 +78,9 @@ jobs:
     needs: deploy
 
     env:
-      DASHBOARD_ECR: 415529767461.dkr.ecr.us-east-1.amazonaws.com/procurement-agent-dashboard
-      LAMBDA_DASHBOARD: procurement-agent-dashboard
-      FRONTEND_BUCKET: procurement-agent-frontend-415529767461
+      DASHBOARD_ECR: 415529767461.dkr.ecr.us-east-1.amazonaws.com/procurement-agent-prod-dashboard
+      LAMBDA_DASHBOARD: procurement-agent-prod-dashboard
+      FRONTEND_BUCKET: procurement-agent-prod-frontend-415529767461
 
     steps:
       - uses: actions/checkout@v4

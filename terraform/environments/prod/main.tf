@@ -40,6 +40,7 @@ module "procurement_agent" {
   gmail_address        = var.gmail_address
   gmail_app_password   = var.gmail_app_password
   tavily_api_key       = var.tavily_api_key
+  jwt_secret           = var.jwt_secret
   log_level            = "INFO"
   domain_name          = var.domain_name
 
@@ -97,6 +98,13 @@ variable "gmail_app_password" {
 
 variable "tavily_api_key" {
   description = "Tavily search API key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "jwt_secret" {
+  description = "Secret key for JWT token signing"
   type        = string
   sensitive   = true
   default     = ""
