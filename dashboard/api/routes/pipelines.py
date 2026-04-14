@@ -16,7 +16,8 @@ router = APIRouter()
 
 STAGE_ORDER = [
     "pending", "analyzing", "sourcing", "rfqs_sent",
-    "offers_received", "evaluated", "completed",
+    "awaiting_responses", "offers_received", "evaluation_sent",
+    "evaluated", "po_generated", "completed",
 ]
 
 
@@ -25,6 +26,8 @@ def _stage_status(current_status: str, stage: str) -> str:
         return "error" if stage == "analyzing" else "skipped"
     current_idx = STAGE_ORDER.index(current_status) if current_status in STAGE_ORDER else -1
     stage_idx = STAGE_ORDER.index(stage) if stage in STAGE_ORDER else -1
+    if current_idx < 0:
+        return "pending"
     if stage_idx < current_idx:
         return "done"
     elif stage_idx == current_idx:
@@ -63,8 +66,8 @@ def get_pipelines(
             "analysis": _stage_status(req.status, "analyzing"),
             "sourcing": _stage_status(req.status, "sourcing"),
             "rfqs": _stage_status(req.status, "rfqs_sent"),
-            "offers": _stage_status(req.status, "offers_received"),
-            "evaluation": _stage_status(req.status, "evaluated"),
+            "offers": _stage_status(req.status, "awaiting_responses"),
+            "evaluation": _stage_status(req.status, "evaluation_sent"),
         }
 
         results.append({
