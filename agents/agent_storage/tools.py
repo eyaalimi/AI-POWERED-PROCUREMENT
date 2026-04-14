@@ -9,6 +9,7 @@ from typing import Optional
 
 from db.models import (
     ProcurementRequest, Supplier, RFQ, Offer, Evaluation,
+    PipelineEvent, User,
     get_engine, get_session_factory, create_tables,
 )
 from logger import get_logger
@@ -27,6 +28,25 @@ class StorageTools:
     def _session(self):
         return self._Session()
 
+    def log_event(self, request_id: str, agent: str, event_type: str, message: str, details: str = None):
+        """Write a PipelineEvent record for the activity log."""
+        session = self._session()
+        try:
+            event = PipelineEvent(
+                request_id=uuid.UUID(request_id) if request_id else None,
+                agent=agent,
+                event_type=event_type,
+                message=message,
+                details=details,
+            )
+            session.add(event)
+            session.commit()
+        except Exception as exc:
+            session.rollback()
+            logger.warning("Failed to log pipeline event", extra={"error": str(exc)})
+        finally:
+            session.close()
+
     # ── Procurement Request ──────────────────────────────────────────────────
 
     def store_request(self, spec: dict) -> str:
@@ -36,6 +56,18 @@ class StorageTools:
         """
         session = self._session()
         try:
+            # Look up the requester to get company_id and user id
+            requester_email = spec.get("requester_email", "")
+            company_id = None
+            created_by_id = None
+            if requester_email:
+                user = session.query(User).filter(
+                    User.email == requester_email.lower().strip()
+                ).first()
+                if user:
+                    company_id = user.company_id
+                    created_by_id = user.id
+
             req = ProcurementRequest(
                 product=spec.get("product", ""),
                 category=spec.get("category", ""),
@@ -44,15 +76,21 @@ class StorageTools:
                 budget_min=spec.get("budget_min"),
                 budget_max=spec.get("budget_max"),
                 deadline=spec.get("deadline"),
-                requester_email=spec.get("requester_email", ""),
+                requester_email=requester_email,
                 is_valid=spec.get("is_valid", True),
                 rejection_reason=spec.get("rejection_reason"),
                 status="pending",
+                company_id=company_id,
+                created_by_id=created_by_id,
             )
             session.add(req)
             session.commit()
             request_id = str(req.id)
-            logger.info("Stored procurement request", extra={"request_id": request_id})
+            logger.info("Stored procurement request", extra={
+                "request_id": request_id, "company_id": str(company_id),
+            })
+            self.log_event(request_id, "analysis", "success",
+                           f"New procurement request created for: {spec.get('product', '')}")
             return request_id
         except Exception as exc:
             session.rollback()
@@ -91,6 +129,8 @@ class StorageTools:
             logger.info("Stored suppliers", extra={
                 "request_id": request_id, "count": len(result),
             })
+            self.log_event(request_id, "sourcing", "success",
+                           f"{len(result)} suppliers found and stored")
             return result
         except Exception as exc:
             session.rollback()
@@ -140,6 +180,9 @@ class StorageTools:
             logger.info("Stored RFQs", extra={
                 "request_id": request_id, "count": len(result),
             })
+            sent_count = sum(1 for r in rfq_records if r.get("status") == "sent")
+            self.log_event(request_id, "communication", "success",
+                           f"{sent_count} RFQs sent to suppliers")
             return result
         except Exception as exc:
             session.rollback()
@@ -203,6 +246,8 @@ class StorageTools:
             logger.info("Stored offers", extra={
                 "request_id": request_id, "count": len(result),
             })
+            self.log_event(request_id, "communication", "success",
+                           f"{len(result)} supplier offers received")
             return result
         except Exception as exc:
             session.rollback()
@@ -276,6 +321,8 @@ class StorageTools:
             logger.info("Stored evaluations", extra={
                 "request_id": request_id, "count": len(result),
             })
+            self.log_event(request_id, "evaluation", "success",
+                           f"Evaluation complete — {len(result)} suppliers scored")
             return result
         except Exception as exc:
             session.rollback()
@@ -411,6 +458,8 @@ class StorageTools:
             logger.info("Updated request status", extra={
                 "request_id": request_id, "status": status,
             })
+            self.log_event(request_id, "pipeline", "info",
+                           f"Request status updated to: {status}")
         except Exception as exc:
             session.rollback()
             logger.error("Failed to update status", extra={"error": str(exc)})

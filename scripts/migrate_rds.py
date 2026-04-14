@@ -53,6 +53,20 @@ def main():
                 conn.commit()
                 print(f"  ADDED {table}.{col}")
 
+    # ── Backfill company_id on existing requests using requester_email ────
+    print("\nBackfilling company_id on existing requests...")
+    with engine.connect() as conn:
+        updated = conn.execute(text("""
+            UPDATE procurement_requests pr
+            SET company_id = u.company_id,
+                created_by_id = u.id
+            FROM users u
+            WHERE pr.company_id IS NULL
+              AND LOWER(TRIM(pr.requester_email)) = LOWER(TRIM(u.email))
+        """))
+        conn.commit()
+        print(f"  Updated {updated.rowcount} requests with company_id")
+
     print("\nMigration complete.")
 
 
