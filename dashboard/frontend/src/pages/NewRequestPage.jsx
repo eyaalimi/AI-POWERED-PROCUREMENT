@@ -47,7 +47,7 @@ export default function NewRequestPage() {
 
   const openGmail = () => {
     if (!result) return;
-    const to = 'procurement.ai.system@gmail.com';
+    const to = 'test@procurement-ai.click';
     const subject = encodeURIComponent(result.mailto_subject);
     const body = encodeURIComponent(result.mailto_body);
     window.open(`https://mail.google.com/mail/?view=cm&to=${to}&su=${subject}&body=${body}`, '_blank');
