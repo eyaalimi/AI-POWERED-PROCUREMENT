@@ -34,8 +34,8 @@ export default function Sidebar() {
       label: 'Management',
       links: [
         { to: '/suppliers', icon: Truck, label: 'Suppliers' },
-        { to: '/budget', icon: DollarSign, label: 'Budget' },
         ...(user?.role === 'admin' ? [
+          { to: '/budget', icon: DollarSign, label: 'Budget' },
           { to: '/blacklist', icon: Shield, label: 'Blacklist' },
           { to: '/users', icon: Users, label: 'Team Members' },
         ] : []),
