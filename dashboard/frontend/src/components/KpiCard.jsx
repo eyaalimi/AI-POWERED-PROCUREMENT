@@ -9,7 +9,7 @@ export default function KpiCard({ title, value, subtitle, color = '#40E0D0', ico
         </div>
         {Icon && (
           <div className="kpi-icon" style={{ background: `linear-gradient(135deg, ${color}22, rgba(27,58,107,0.08))` }}>
-            <Icon size={22} color={color} />
+            <Icon size={17} color={color} />
           </div>
         )}
       </div>
