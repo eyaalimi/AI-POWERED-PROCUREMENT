@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { BarChart3, GitBranch, Activity, Truck, Shield, Mail, Package, Zap, LogOut, User, Users, FilePlus, DollarSign } from 'lucide-react';
+import { BarChart3, GitBranch, Activity, Truck, Shield, Mail, Package, Zap, LogOut, User, Users, FilePlus, DollarSign, FileText } from 'lucide-react';
 import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -27,6 +27,7 @@ export default function Sidebar() {
       links: [
         { to: '/pipelines', icon: GitBranch, label: 'Pipelines' },
         { to: '/orders', icon: Package, label: 'Orders' },
+        { to: '/reports', icon: FileText, label: 'RFQ Reports' },
         { to: '/activity', icon: Activity, label: 'Activity Log' },
       ],
     },

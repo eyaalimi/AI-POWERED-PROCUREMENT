@@ -1,7 +1,8 @@
 import { useApi } from '../hooks/useApi';
+import { useNavigate } from 'react-router-dom';
 import KpiCard from '../components/KpiCard';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, CartesianGrid } from 'recharts';
-import { FileText, CheckCircle, DollarSign, TrendingDown, Clock, Send, Inbox } from 'lucide-react';
+import { FileText, CheckCircle, DollarSign, TrendingDown, Clock, Send, Inbox, Eye, Award } from 'lucide-react';
 
 const STATUS_COLORS = {
   completed: '#10b981',
@@ -28,8 +29,31 @@ function renderCustomLabel({ cx, cy, midAngle, innerRadius, outerRadius, name, v
   );
 }
 
+const WORKFLOW_PHASES = [
+  {
+    name: 'Preparation',
+    color: '#40E0D0',
+    statuses: ['pending', 'analyzing'],
+    labels: ['Received', 'Analyzing'],
+  },
+  {
+    name: 'Execution',
+    color: '#1B3A6B',
+    statuses: ['sourcing', 'rfqs_sent', 'awaiting_responses', 'offers_received'],
+    labels: ['Sourcing', 'RFQs Sent', 'Awaiting Offers', 'Offers In'],
+  },
+  {
+    name: 'Finalisation',
+    color: '#27AE60',
+    statuses: ['evaluated', 'evaluation_sent', 'po_generated', 'completed'],
+    labels: ['Evaluated', 'Eval Sent', 'PO Created', 'Completed'],
+  },
+];
+
 export default function KpisPage() {
   const { data, loading, error } = useApi('/dashboard/kpis', { interval: 15000 });
+  const { data: recsData } = useApi('/dashboard/recommendations', { interval: 30000 });
+  const navigate = useNavigate();
 
   if (loading) return <div className="page-loading">Loading dashboard...</div>;
   if (error) return <div className="page-error">Error: {error}</div>;
@@ -99,6 +123,90 @@ export default function KpisPage() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* Workflow Visualization */}
+      <div className="detail-card" style={{ marginTop: 24 }}>
+        <div className="detail-card-header">
+          <h3>Procurement Workflow</h3>
+        </div>
+        <div className="workflow-grid">
+          {WORKFLOW_PHASES.map(phase => {
+            const phaseTotal = phase.statuses.reduce((sum, s) => sum + (kpis.status_breakdown?.[s] || 0), 0);
+            const pct = kpis.total_requests > 0 ? Math.round(phaseTotal / kpis.total_requests * 100) : 0;
+            return (
+              <div key={phase.name} className="workflow-card" style={{ '--wf-color': phase.color }}>
+                <div className="workflow-card-header">
+                  <span className="workflow-phase-name">{phase.name}</span>
+                  <span className="workflow-phase-count">{phaseTotal}</span>
+                </div>
+                <div className="workflow-progress-bar">
+                  <div className="workflow-progress-fill" style={{ width: `${pct}%`, background: phase.color }} />
+                </div>
+                <div className="workflow-states">
+                  {phase.statuses.map((s, i) => {
+                    const count = kpis.status_breakdown?.[s] || 0;
+                    return (
+                      <div key={s} className="workflow-state-row">
+                        <span className="workflow-state-dot" style={{ background: phase.color }} />
+                        <span className="workflow-state-label">{phase.labels[i]}</span>
+                        <span className="workflow-state-count">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Recommendations Table */}
+      {(recsData?.recommendations?.length > 0) && (
+        <div className="detail-card" style={{ marginTop: 24 }}>
+          <div className="detail-card-header">
+            <h3><Award size={16} /> Top Recommendations</h3>
+            <span className="stat-badge" style={{ background: '#D5F5E3', color: '#1E8449' }}>
+              {recsData.recommendations.length} evaluated
+            </span>
+          </div>
+          <div className="table-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Best Supplier</th>
+                  <th>Score</th>
+                  <th>Date</th>
+                  <th style={{ textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recsData.recommendations.map(r => (
+                  <tr key={r.request_id}>
+                    <td className="td-title">{r.product}</td>
+                    <td><strong>{r.supplier_name}</strong></td>
+                    <td>
+                      <strong style={{ color: '#27AE60' }}>{r.overall_score?.toFixed(1)}</strong>
+                      <span style={{ color: '#95A5A6', fontSize: 12 }}>/100</span>
+                    </td>
+                    <td style={{ fontSize: 12, color: '#95A5A6' }}>
+                      {r.created_at ? new Date(r.created_at).toLocaleDateString('fr-FR') : '—'}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        className="btn-sm-action"
+                        onClick={() => navigate(`/request/${r.request_id}`)}
+                      >
+                        <Eye size={13} /> Detail
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -20,7 +20,7 @@ from dashboard.api.auth import router as auth_router, user_to_dict
 from dashboard.api.deps import get_current_user, get_db
 from dashboard.api.routes import (
     kpis, pipelines, activity, suppliers, evaluations,
-    requests, emails, orders, dashboard_stats, budget, export,
+    requests, emails, orders, dashboard_stats, budget, export, reports,
 )
 
 app = FastAPI(
@@ -54,6 +54,7 @@ app.include_router(emails.router, prefix="/api/emails", tags=["Emails"])
 app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
 app.include_router(budget.router, prefix="/api/dashboard", tags=["Budget"])
 app.include_router(export.router, prefix="/api/export", tags=["Export"])
+app.include_router(reports.router, prefix="/api/dashboard", tags=["Reports"])
 
 
 @app.get("/api/health")

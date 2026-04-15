@@ -16,6 +16,8 @@ import SelectSupplierPage from './pages/SelectSupplierPage';
 import UsersPage from './pages/UsersPage';
 import NewRequestPage from './pages/NewRequestPage';
 import BudgetPage from './pages/BudgetPage';
+import RequestDetailPage from './pages/RequestDetailPage';
+import ReportsPage from './pages/ReportsPage';
 import LoginPage from './pages/LoginPage';
 import './App.css';
 
@@ -27,6 +29,7 @@ const PAGE_TITLES = {
   '/suppliers': 'Suppliers',
   '/blacklist': 'Blacklist',
   '/orders': 'Orders',
+  '/reports': 'RFQ Reports',
   '/new-request': 'New Request',
   '/budget': 'Budget',
   '/users': 'Team Members',
@@ -67,6 +70,8 @@ function DashboardLayout() {
             <Route path="/suppliers" element={<SuppliersPage />} />
             <Route path="/blacklist" element={<BlacklistPage />} />
             <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/request/:requestId" element={<RequestDetailPage />} />
             <Route path="/new-request" element={<NewRequestPage />} />
             <Route path="/budget" element={<BudgetPage />} />
             <Route path="/users" element={<UsersPage />} />

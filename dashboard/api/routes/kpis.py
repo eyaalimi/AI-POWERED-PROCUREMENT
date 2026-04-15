@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from sqlalchemy import desc
+
 from db.models import ProcurementRequest, Offer, Evaluation, RFQ, User
 from dashboard.api.deps import get_db, get_current_user
 
@@ -87,3 +89,35 @@ def get_kpis(db: Session = Depends(get_db), current_user: User = Depends(get_cur
         "total_rfqs_sent": total_rfqs,
         "total_offers_received": total_offers,
     }
+
+
+@router.get("/recommendations")
+def get_recommendations(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Top supplier recommendations — best-ranked evaluations for recent requests."""
+    req_q = db.query(ProcurementRequest.id).filter(
+        ProcurementRequest.company_id == current_user.company_id
+    )
+    if current_user.role == "employee":
+        req_q = req_q.filter(ProcurementRequest.created_by_id == current_user.id)
+    req_ids = req_q.subquery()
+
+    top_evals = (
+        db.query(Evaluation)
+        .filter(Evaluation.request_id.in_(req_ids), Evaluation.rank == 1)
+        .order_by(desc(Evaluation.created_at))
+        .limit(10)
+        .all()
+    )
+
+    results = []
+    for ev in top_evals:
+        req = db.query(ProcurementRequest).filter_by(id=ev.request_id).first()
+        results.append({
+            "request_id": str(ev.request_id),
+            "product": req.product if req else "Unknown",
+            "supplier_name": ev.supplier_name,
+            "overall_score": ev.overall_score,
+            "created_at": ev.created_at.isoformat() if ev.created_at else None,
+        })
+
+    return {"recommendations": results}

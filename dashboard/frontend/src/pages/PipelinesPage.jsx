@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApi, exportCsv } from '../hooks/useApi';
 import StageIndicator from '../components/StageIndicator';
-import { Search, Download } from 'lucide-react';
+import { Search, Download, Eye } from 'lucide-react';
 
 export default function PipelinesPage() {
+  const navigate = useNavigate();
   const { data, loading, error } = useApi('/dashboard/pipelines', { interval: 10000 });
   const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState('');
@@ -46,6 +48,7 @@ export default function PipelinesPage() {
               <th>Stages</th>
               <th>Budget</th>
               <th>Date</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -56,10 +59,15 @@ export default function PipelinesPage() {
                 <td><StageIndicator stages={p.stages} /></td>
                 <td style={{ fontWeight: 500 }}>{p.budget ? `${p.budget.toLocaleString()} TND` : '—'}</td>
                 <td style={{ color: '#94a3b8', fontSize: 13 }}>{p.created_at ? new Date(p.created_at).toLocaleDateString('fr-FR') : '—'}</td>
+                <td>
+                  <button className="btn-sm-action" onClick={(e) => { e.stopPropagation(); navigate(`/request/${p.id}`); }}>
+                    <Eye size={13} /> View
+                  </button>
+                </td>
               </tr>
             ))}
             {pipelines.length === 0 && (
-              <tr><td colSpan={5} className="empty-row">No pipelines found</td></tr>
+              <tr><td colSpan={6} className="empty-row">No pipelines found</td></tr>
             )}
           </tbody>
         </table>
