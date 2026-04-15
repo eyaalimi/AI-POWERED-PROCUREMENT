@@ -40,7 +40,7 @@ function TopHeader() {
     <div className="top-header">
       <div className="top-header-left">
         <h1>{title}</h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#94a3b8' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
           <span className="live-dot" />
           <span>Live</span>
         </div>
