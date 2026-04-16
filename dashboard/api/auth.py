@@ -36,6 +36,14 @@ class CreateUserRequest(BaseModel):
     role: str = "employee"
 
 
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    company_name: str
+    department: str = ""
+
+
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -93,6 +101,45 @@ def create_user(body: CreateUserRequest, db: Session = Depends(get_db), admin: U
     db.refresh(user)
 
     return user_to_dict(user, company.name if company else "")
+
+
+@router.post("/register")
+def register(body: RegisterRequest, db: Session = Depends(get_db)):
+    existing = db.query(User).filter_by(email=body.email.lower().strip()).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    company_name = body.company_name.strip()
+    company = db.query(Company).filter_by(name=company_name).first()
+
+    if company:
+        # Company exists — check if it has any users (first user = admin)
+        has_users = db.query(User).filter_by(company_id=company.id).first()
+        role = "employee" if has_users else "admin"
+    else:
+        # New company — creator becomes admin
+        company = Company(name=company_name)
+        db.add(company)
+        db.flush()
+        role = "admin"
+
+    user = User(
+        name=body.name.strip(),
+        email=body.email.lower().strip(),
+        hashed_password=hash_password(body.password),
+        department=body.department.strip(),
+        role=role,
+        company_id=company.id,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "access_token": create_token(user),
+        "token_type": "bearer",
+        "user": user_to_dict(user, company.name),
+    }
 
 
 @router.post("/login")

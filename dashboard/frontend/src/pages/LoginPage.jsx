@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Zap, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Zap, Mail, Lock, AlertCircle, User, Building2 } from 'lucide-react';
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, register } = useAuth();
   const navigate = useNavigate();
+  const [mode, setMode] = useState('login'); // login | register
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -16,7 +19,11 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      if (mode === 'login') {
+        await login(email, password);
+      } else {
+        await register(name, email, password, companyName);
+      }
       navigate('/');
     } catch (err) {
       setError(err.message);
@@ -34,7 +41,7 @@ export default function LoginPage() {
               <Zap size={28} />
             </div>
             <h1>Procurement AI</h1>
-            <p>Sign in to your account</p>
+            <p>{mode === 'login' ? 'Sign in to your account' : 'Create your account'}</p>
           </div>
           <div className="auth-separator" />
 
@@ -46,6 +53,38 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="auth-form">
+            {mode === 'register' && (
+              <>
+                <div className="auth-field">
+                  <label>Full Name</label>
+                  <div className="auth-input-wrapper">
+                    <User size={16} />
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      placeholder="Your full name"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="auth-field">
+                  <label>Company Name</label>
+                  <div className="auth-input-wrapper">
+                    <Building2 size={16} />
+                    <input
+                      type="text"
+                      value={companyName}
+                      onChange={e => setCompanyName(e.target.value)}
+                      placeholder="Your company"
+                      required
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="auth-field">
               <label>Email</label>
               <div className="auth-input-wrapper">
@@ -68,19 +107,26 @@ export default function LoginPage() {
                   type="password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder={mode === 'login' ? 'Enter your password' : 'Choose a password'}
                   required
                 />
               </div>
             </div>
 
             <button type="submit" className="auth-btn" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading
+                ? (mode === 'login' ? 'Signing in...' : 'Creating account...')
+                : (mode === 'login' ? 'Sign In' : 'Create Account')
+              }
             </button>
           </form>
 
           <div className="auth-footer">
-            Contact your admin to get an account
+            {mode === 'login' ? (
+              <>Don&apos;t have an account? <button className="auth-switch-btn" onClick={() => { setMode('register'); setError(''); }}>Register</button></>
+            ) : (
+              <>Already have an account? <button className="auth-switch-btn" onClick={() => { setMode('login'); setError(''); }}>Sign In</button></>
+            )}
           </div>
         </div>
 
