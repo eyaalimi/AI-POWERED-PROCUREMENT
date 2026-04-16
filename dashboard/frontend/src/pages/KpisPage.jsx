@@ -4,6 +4,13 @@ import KpiCard from '../components/KpiCard';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, CartesianGrid } from 'recharts';
 import { FileText, CheckCircle, DollarSign, TrendingDown, Clock, Send, Inbox, Eye, Award } from 'lucide-react';
 
+function formatNumber(n) {
+  if (!n) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString();
+}
+
 const STATUS_COLORS = {
   completed: '#10b981',
   evaluated: '#10b981',
@@ -70,8 +77,8 @@ export default function KpisPage() {
       <div className="kpi-grid">
         <KpiCard icon={FileText} title="Total Requests" value={kpis.total_requests} color="#6366f1" />
         <KpiCard icon={CheckCircle} title="Success Rate" value={`${kpis.success_rate}%`} color="#10b981" />
-        <KpiCard icon={DollarSign} title="Total Volume" value={`${(kpis.total_volume_tnd || 0).toLocaleString()} TND`} color="#3b82f6" />
-        <KpiCard icon={TrendingDown} title="Savings" value={`${(kpis.savings_tnd || 0).toLocaleString()} TND`} color="#0d9488" />
+        <KpiCard icon={DollarSign} title="Total Volume" value={`${formatNumber(kpis.total_volume_tnd)} TND`} color="#3b82f6" />
+        <KpiCard icon={TrendingDown} title="Savings" value={`${formatNumber(kpis.savings_tnd)} TND`} color="#0d9488" />
         <KpiCard icon={Clock} title="Avg Cycle" value={`${kpis.avg_cycle_hours?.toFixed(1) || '—'}h`} color="#8b5cf6" />
         <KpiCard icon={Send} title="RFQs Sent" value={kpis.total_rfqs_sent} color="#f59e0b" />
         <KpiCard icon={Inbox} title="Offers Received" value={kpis.total_offers_received} color="#ea580c" />

@@ -278,7 +278,7 @@ body {
 /* === KPI Cards === */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin-bottom: 22px;
 }
@@ -1008,7 +1008,7 @@ body {
   .main-content { margin-left: 64px; }
   .page-content { padding: 16px; }
   .top-header { padding: 0 16px; }
-  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
 }
 
 /* ============================================================
