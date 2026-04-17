@@ -41,14 +41,6 @@ export default function PipelinesPage() {
 
       <div className="table-wrapper">
         <table className="data-table">
-          <colgroup>
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '14%' }} />
-            <col style={{ width: '38%' }} />
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '12%' }} />
-          </colgroup>
           <thead>
             <tr>
               <th>Request</th>
