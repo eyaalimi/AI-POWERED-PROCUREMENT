@@ -251,6 +251,8 @@ body {
 .page-content {
   flex: 1;
   padding: 28px 28px;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .page h1 {
@@ -391,11 +393,13 @@ body {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   border: none;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .data-table {
   width: 100%;
+  min-width: 700px;
   border-collapse: collapse;
 }
 
