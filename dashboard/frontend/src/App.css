@@ -203,8 +203,8 @@ body {
 /* === Main Content === */
 .main-content {
   margin-left: var(--sidebar-width);
-  flex: 1;
-  min-width: 0;
+  width: calc(100vw - var(--sidebar-width));
+  max-width: calc(100vw - var(--sidebar-width));
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -1009,7 +1009,7 @@ body {
   .sidebar-logo-icon { width: 32px; height: 32px; font-size: 14px; }
   .sidebar-header { padding: 16px 12px; }
   .nav-link { justify-content: center; padding: 12px; border-left: none; }
-  .main-content { margin-left: 64px; }
+  .main-content { margin-left: 64px; width: calc(100vw - 64px); max-width: calc(100vw - 64px); }
   .page-content { padding: 16px; }
   .top-header { padding: 0 16px; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
