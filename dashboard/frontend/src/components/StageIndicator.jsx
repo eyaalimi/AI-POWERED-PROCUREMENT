@@ -18,7 +18,7 @@ export default function StageIndicator({ stages }) {
   };
 
   return (
-    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
       {Object.entries(stages).map(([key, status]) => {
         const { icon: Icon, color, bg } = stageConfig[status] || stageConfig.pending;
         return (
