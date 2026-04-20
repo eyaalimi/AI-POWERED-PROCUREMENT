@@ -189,3 +189,32 @@ def get_request_timeline(request_id: str, db: Session = Depends(get_db), current
          "created_at": e.created_at.isoformat() if e.created_at else None}
         for e in events
     ]}
+
+
+@router.post("/adopt-orphans")
+def adopt_orphan_requests(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Admin-only: assign unowned requests to the company based on requester email."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Find all company user emails
+    company_emails = [
+        u.email for u in db.query(User).filter_by(company_id=current_user.company_id).all()
+    ]
+
+    orphans = db.query(ProcurementRequest).filter(
+        ProcurementRequest.company_id.is_(None),
+        ProcurementRequest.requester_email.in_(company_emails),
+    ).all()
+
+    for req in orphans:
+        user = db.query(User).filter_by(email=req.requester_email).first()
+        req.company_id = current_user.company_id
+        if user:
+            req.created_by_id = user.id
+
+    db.commit()
+    return {"adopted": len(orphans)}

@@ -139,39 +139,51 @@ resource "aws_cloudwatch_dashboard" "procurement_ai" {
         }
       },
 
-      # ── Row 4: Token Usage ───────────────────────────────────────────────
+      # ── Row 4: Bedrock Token Usage (native metrics) ─────────────────────
       {
         type   = "metric"
         x      = 0
         y      = 18
-        width  = 12
+        width  = 8
         height = 6
         properties = {
-          title  = "Token Usage — Input"
+          title  = "Bedrock - Input Tokens"
           region = var.aws_region
           metrics = [
-            ["ProcurementAI", "TokensUsed", "Agent", "orchestrator", "Direction", "input", { stat = "Sum", period = 3600 }],
-            ["ProcurementAI", "TokensUsed", "Agent", "analysis", "Direction", "input", { stat = "Sum", period = 3600 }],
-            ["ProcurementAI", "TokensUsed", "Agent", "sourcing", "Direction", "input", { stat = "Sum", period = 3600 }],
-            ["ProcurementAI", "TokensUsed", "Agent", "communication_rfq", "Direction", "input", { stat = "Sum", period = 3600 }]
+            ["AWS/Bedrock", "InputTokenCount", "ModelId", "anthropic.claude-3-haiku-20240307-v1:0", { stat = "Sum", period = 3600 }],
+            ["AWS/Bedrock", "InputTokenCount", "ModelId", "anthropic.claude-3-5-sonnet-20241022-v2:0", { stat = "Sum", period = 3600 }]
           ]
           view = "timeSeries"
         }
       },
       {
         type   = "metric"
-        x      = 12
+        x      = 8
         y      = 18
-        width  = 12
+        width  = 8
         height = 6
         properties = {
-          title  = "Token Usage — Output"
+          title  = "Bedrock - Output Tokens"
           region = var.aws_region
           metrics = [
-            ["ProcurementAI", "TokensUsed", "Agent", "orchestrator", "Direction", "output", { stat = "Sum", period = 3600 }],
-            ["ProcurementAI", "TokensUsed", "Agent", "analysis", "Direction", "output", { stat = "Sum", period = 3600 }],
-            ["ProcurementAI", "TokensUsed", "Agent", "sourcing", "Direction", "output", { stat = "Sum", period = 3600 }],
-            ["ProcurementAI", "TokensUsed", "Agent", "communication_rfq", "Direction", "output", { stat = "Sum", period = 3600 }]
+            ["AWS/Bedrock", "OutputTokenCount", "ModelId", "anthropic.claude-3-haiku-20240307-v1:0", { stat = "Sum", period = 3600 }],
+            ["AWS/Bedrock", "OutputTokenCount", "ModelId", "anthropic.claude-3-5-sonnet-20241022-v2:0", { stat = "Sum", period = 3600 }]
+          ]
+          view = "timeSeries"
+        }
+      },
+      {
+        type   = "metric"
+        x      = 16
+        y      = 18
+        width  = 8
+        height = 6
+        properties = {
+          title  = "Bedrock - Invocations"
+          region = var.aws_region
+          metrics = [
+            ["AWS/Bedrock", "Invocations", "ModelId", "anthropic.claude-3-haiku-20240307-v1:0", { stat = "Sum", period = 3600 }],
+            ["AWS/Bedrock", "Invocations", "ModelId", "anthropic.claude-3-5-sonnet-20241022-v2:0", { stat = "Sum", period = 3600 }]
           ]
           view = "timeSeries"
         }

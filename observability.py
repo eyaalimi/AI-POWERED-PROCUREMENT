@@ -81,12 +81,6 @@ def track_agent_call(agent_name: str):
         raise
 
 
-def record_tokens(agent_name: str, input_tokens: int, output_tokens: int):
-    """Record token usage for an agent call."""
-    dims = [{"Name": "Agent", "Value": agent_name}]
-    _put_metric("TokensUsed", input_tokens, "Count", dims + [{"Name": "Direction", "Value": "input"}])
-    _put_metric("TokensUsed", output_tokens, "Count", dims + [{"Name": "Direction", "Value": "output"}])
-
 
 def pipeline_started():
     """Mark a pipeline as started."""
