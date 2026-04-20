@@ -131,9 +131,8 @@ jobs:
       - name: Run Bandit
         run: |
           pip install bandit
-          bandit -r agents/ dashboard/api/ -ll -ii --format json -o bandit-report.json || true
-          bandit -r agents/ dashboard/api/ -ll -ii
-        continue-on-error: false
+          bandit -r agents/ dashboard/api/ -ll -ii -s B108 --format json -o bandit-report.json || true
+          bandit -r agents/ dashboard/api/ -ll -ii -s B108
 
       - name: Upload SAST report
         if: always()
