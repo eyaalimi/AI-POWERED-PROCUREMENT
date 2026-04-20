@@ -1,0 +1,9 @@
+# ecdsa CVE-2024-23342 - Minerva timing attack. No fix available.
+# python-jose uses ecdsa but we only use RSA/HMAC for JWT signing.
+CVE-2024-23342
+
+# jaraco.context - vendored inside setuptools, not used at runtime
+CVE-2026-23949
+
+# wheel - vendored inside setuptools, not used at runtime (we don't install wheels in Lambda)
+CVE-2026-24049

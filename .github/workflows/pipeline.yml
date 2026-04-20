@@ -228,6 +228,7 @@ jobs:
           severity: 'HIGH,CRITICAL'
           exit-code: '1'
           format: 'table'
+          trivyignores: '.trivyignore'
 
   # ── 5. Build & push Dashboard API image ──────────────────────────────────
   build-dashboard:
@@ -260,6 +261,7 @@ jobs:
           severity: 'HIGH,CRITICAL'
           exit-code: '1'
           format: 'table'
+          trivyignores: '.trivyignore'
 
   # ── 6. Deploy Agent Lambdas ──────────────────────────────────────────────
   deploy-agent:
