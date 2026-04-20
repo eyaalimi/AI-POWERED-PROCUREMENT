@@ -10,6 +10,8 @@
 #                                └───────────────┘   └──────────────────┘
 #
 #  CI runs on all pushes & PRs. CD only runs on main after CI passes.
+#
+#  DevSecOps gates: SAST, SCA, Secrets, Container Scan, Smoke Test
 # =============================================================================
 
 name: "CI/CD Pipeline"
@@ -114,6 +116,74 @@ jobs:
           npm ci
           VITE_API_BASE=https://placeholder.example.com/api npm run build
 
+  # ── 2b. Security — SAST (Bandit) ──────────────────────────────────────────
+  sast:
+    name: "Security · SAST"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run Bandit
+        run: |
+          pip install bandit
+          bandit -r agents/ dashboard/api/ -ll -ii --format json -o bandit-report.json || true
+          bandit -r agents/ dashboard/api/ -ll -ii
+        continue-on-error: false
+
+      - name: Upload SAST report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  # ── 2c. Security — SCA (Dependency Vulnerabilities) ─────────────────────
+  dependency-scan:
+    name: "Security · SCA"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: pip-audit (Python)
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt --desc on
+
+      - name: npm audit (Frontend)
+        run: |
+          cd dashboard/frontend
+          npm ci
+          npm audit --audit-level=high || true
+
+  # ── 2d. Security — Secrets Detection ────────────────────────────────────
+  secrets-scan:
+    name: "Security · Secrets"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified --results=verified
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  CD JOBS — only on push to main
 # ─────────────────────────────────────────────────────────────────────────────
@@ -122,7 +192,7 @@ jobs:
   build-agent:
     name: "CD · Build Agent Image"
     runs-on: ubuntu-latest
-    needs: [test, frontend-check]
+    needs: [test, frontend-check, sast, dependency-scan, secrets-scan]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     outputs:
       image_uri: ${{ steps.build.outputs.image_uri }}
@@ -152,11 +222,19 @@ jobs:
 
           echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
 
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.build.outputs.image_uri }}
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          format: 'table'
+
   # ── 5. Build & push Dashboard API image ──────────────────────────────────
   build-dashboard:
     name: "CD · Build Dashboard Image"
     runs-on: ubuntu-latest
-    needs: [test, frontend-check]
+    needs: [test, frontend-check, sast, dependency-scan, secrets-scan]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
@@ -175,6 +253,14 @@ jobs:
           docker build --platform linux/amd64 -f Dockerfile.dashboard -t dashboard-api .
           docker tag dashboard-api:latest $ECR_REGISTRY/$ECR_REPO_DASHBOARD:latest
           docker push $ECR_REGISTRY/$ECR_REPO_DASHBOARD:latest
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO_DASHBOARD }}:latest
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          format: 'table'
 
   # ── 6. Deploy Agent Lambdas ──────────────────────────────────────────────
   deploy-agent:
@@ -281,12 +367,44 @@ jobs:
             echo "CloudFront invalidation created for $DIST_ID"
           fi
 
-  # ── 9. Summary ──────────────────────────────────────────────────────────
+  # ── 9. Smoke Test ────────────────────────────────────────────────────────
+  smoke-test:
+    name: "CD · Smoke Test"
+    runs-on: ubuntu-latest
+    needs: [deploy-agent, deploy-dashboard, deploy-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Wait for propagation
+        run: sleep 15
+
+      - name: Frontend health check
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://procurement-ai.click/)
+          echo "Frontend returned HTTP $HTTP_CODE"
+          [ "$HTTP_CODE" -eq 200 ] || exit 1
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: API health check
+        run: |
+          API_URL=$(aws apigatewayv2 get-apis --region $AWS_REGION \
+            --query "Items[?Name=='procurement-agent-prod-dashboard-api'].ApiEndpoint" \
+            --output text)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/health")
+          echo "API returned HTTP $HTTP_CODE"
+          [ "$HTTP_CODE" -eq 200 ] || exit 1
+
+  # ── 10. Summary ─────────────────────────────────────────────────────────
   summary:
     name: "Pipeline Summary"
     runs-on: ubuntu-latest
     if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [lint, test, frontend-check, deploy-agent, deploy-dashboard, deploy-frontend]
+    needs: [lint, test, frontend-check, sast, dependency-scan, secrets-scan, deploy-agent, deploy-dashboard, deploy-frontend, smoke-test]
 
     steps:
       - name: Pipeline result
@@ -301,6 +419,10 @@ jobs:
           echo "| Deploy Agent | ${{ needs.deploy-agent.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy Dashboard | ${{ needs.deploy-dashboard.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy Frontend | ${{ needs.deploy-frontend.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SAST (Bandit) | ${{ needs.sast.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SCA (pip-audit) | ${{ needs.dependency-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secrets Scan | ${{ needs.secrets-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Test | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
           echo "**Author:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
