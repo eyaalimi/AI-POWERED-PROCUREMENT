@@ -3,7 +3,6 @@ tests/test_prompt_regression.py — Prompt regression tests.
 Ensures prompts maintain critical structural requirements across versions.
 Run with: pytest tests/test_prompt_regression.py -v
 """
-import pytest
 from prompts import (
     ANALYSIS_PROMPT,
     SOURCING_PROMPT,
