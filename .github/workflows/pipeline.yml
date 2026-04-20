@@ -96,6 +96,7 @@ jobs:
             tests/test_sanitizer.py \
             tests/test_agent_storage.py \
             tests/test_agent_evaluation.py \
+            tests/test_prompt_regression.py \
             -v --tb=short
 
   # ── 3. Frontend build check ───────────────────────────────────────────────

@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 
 from fastapi import Depends
 
@@ -60,6 +61,13 @@ app.include_router(reports.router, prefix="/api/dashboard", tags=["Reports"])
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/metrics", tags=["Observability"])
+def metrics():
+    """Prometheus metrics endpoint for Grafana scraping."""
+    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+    return PlainTextResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/api/auth/users", tags=["Auth"])

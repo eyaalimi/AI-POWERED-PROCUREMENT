@@ -23,6 +23,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from config import settings
 from logger import get_logger
+from observability import track_agent_call
 from agents.agent_sourcing.tools import log_sourcing_decision, search_existing_suppliers, search_suppliers, get_supplier_contact
 
 logger = get_logger(__name__)
@@ -197,7 +198,8 @@ and return up to 12 results ranked by relevance.
 """
 
         try:
-            response = self._agent(prompt)
+            with track_agent_call("sourcing"):
+                response = self._agent(prompt)
             raw = str(response).strip()
 
             try:
