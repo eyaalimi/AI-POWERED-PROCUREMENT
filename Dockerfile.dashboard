@@ -10,6 +10,7 @@ COPY dashboard/       ${LAMBDA_TASK_ROOT}/dashboard/
 COPY db/              ${LAMBDA_TASK_ROOT}/db/
 COPY config.py        ${LAMBDA_TASK_ROOT}/
 COPY logger.py        ${LAMBDA_TASK_ROOT}/
+COPY observability.py ${LAMBDA_TASK_ROOT}/
 COPY dashboard_handler.py ${LAMBDA_TASK_ROOT}/
 
 # Lambda entry point
