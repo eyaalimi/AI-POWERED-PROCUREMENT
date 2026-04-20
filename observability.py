@@ -1,5 +1,5 @@
 """
-observability.py — Agent metrics for Prometheus/Grafana.
+observability.py — Agent metrics pushed to AWS CloudWatch.
 Tracks: invocations, latency, errors, token usage per agent.
 
 Usage in agents:
@@ -8,59 +8,57 @@ Usage in agents:
     with track_agent_call("analysis"):
         result = self._agent(prompt)
 
-Exposes metrics at /metrics endpoint (added to dashboard API).
+Metrics are pushed to CloudWatch namespace "ProcurementAI".
+In dev mode (no AWS credentials), metrics are logged locally.
 """
+import logging
+import os
 import time
 from contextlib import contextmanager
-from prometheus_client import Counter, Histogram, Gauge, Info
 
-# ── Metrics ──────────────────────────────────────────────────────────────────
+logger = logging.getLogger(__name__)
 
-AGENT_CALLS_TOTAL = Counter(
-    "agent_calls_total",
-    "Total number of agent invocations",
-    ["agent", "status"],
-)
+# ── CloudWatch namespace ─────────────────────────────────────────────────────
 
-AGENT_LATENCY = Histogram(
-    "agent_latency_seconds",
-    "Agent call latency in seconds",
-    ["agent"],
-    buckets=[0.5, 1, 2, 5, 10, 20, 30, 60, 120],
-)
+NAMESPACE = "ProcurementAI"
+_cw_client = None
 
-AGENT_ERRORS_TOTAL = Counter(
-    "agent_errors_total",
-    "Total agent errors",
-    ["agent", "error_type"],
-)
 
-AGENT_TOKENS_USED = Counter(
-    "agent_tokens_total",
-    "Total tokens consumed by agent calls",
-    ["agent", "direction"],  # direction: input or output
-)
+def _get_cloudwatch():
+    """Lazy-init CloudWatch client."""
+    global _cw_client
+    if _cw_client is None:
+        try:
+            import boto3
+            region = os.environ.get(
+                "AWS_REGION_NAME",
+                os.environ.get("AWS_REGION", "us-east-1"),
+            )
+            _cw_client = boto3.client("cloudwatch", region_name=region)
+        except Exception as e:
+            logger.warning("CloudWatch unavailable, metrics will be logged only: %s", e)
+    return _cw_client
 
-PIPELINE_ACTIVE = Gauge(
-    "pipeline_active_count",
-    "Number of currently running pipelines",
-)
 
-PIPELINE_COMPLETED = Counter(
-    "pipeline_completed_total",
-    "Total completed pipelines",
-    ["status"],  # completed, rejected, failed, awaiting_responses
-)
-
-SYSTEM_INFO = Info(
-    "procurement_ai",
-    "System information",
-)
-SYSTEM_INFO.info({
-    "version": "1.0.0",
-    "model": "amazon-nova-2-lite",
-    "provider": "aws-bedrock",
-})
+def _put_metric(metric_name: str, value: float, unit: str, dimensions: list[dict]):
+    """Push a single metric to CloudWatch (or log it in dev)."""
+    client = _get_cloudwatch()
+    if client:
+        try:
+            client.put_metric_data(
+                Namespace=NAMESPACE,
+                MetricData=[{
+                    "MetricName": metric_name,
+                    "Value": value,
+                    "Unit": unit,
+                    "Dimensions": dimensions,
+                }],
+            )
+        except Exception as e:
+            logger.warning("Failed to push metric %s: %s", metric_name, e)
+    else:
+        dims = {d["Name"]: d["Value"] for d in dimensions}
+        logger.info("METRIC | %s = %.2f %s | %s", metric_name, value, unit, dims)
 
 
 # ── Context manager for tracking ─────────────────────────────────────────────
@@ -68,35 +66,33 @@ SYSTEM_INFO.info({
 @contextmanager
 def track_agent_call(agent_name: str):
     """Track an agent call's latency and success/failure."""
+    dims = [{"Name": "Agent", "Value": agent_name}]
     start = time.time()
     try:
         yield
         duration = time.time() - start
-        AGENT_CALLS_TOTAL.labels(agent=agent_name, status="success").inc()
-        AGENT_LATENCY.labels(agent=agent_name).observe(duration)
+        _put_metric("AgentCalls", 1, "Count", dims + [{"Name": "Status", "Value": "success"}])
+        _put_metric("AgentLatency", duration, "Seconds", dims)
     except Exception as e:
         duration = time.time() - start
-        AGENT_CALLS_TOTAL.labels(agent=agent_name, status="error").inc()
-        AGENT_LATENCY.labels(agent=agent_name).observe(duration)
-        AGENT_ERRORS_TOTAL.labels(
-            agent=agent_name,
-            error_type=type(e).__name__,
-        ).inc()
+        _put_metric("AgentCalls", 1, "Count", dims + [{"Name": "Status", "Value": "error"}])
+        _put_metric("AgentLatency", duration, "Seconds", dims)
+        _put_metric("AgentErrors", 1, "Count", dims + [{"Name": "ErrorType", "Value": type(e).__name__}])
         raise
 
 
 def record_tokens(agent_name: str, input_tokens: int, output_tokens: int):
     """Record token usage for an agent call."""
-    AGENT_TOKENS_USED.labels(agent=agent_name, direction="input").inc(input_tokens)
-    AGENT_TOKENS_USED.labels(agent=agent_name, direction="output").inc(output_tokens)
+    dims = [{"Name": "Agent", "Value": agent_name}]
+    _put_metric("TokensUsed", input_tokens, "Count", dims + [{"Name": "Direction", "Value": "input"}])
+    _put_metric("TokensUsed", output_tokens, "Count", dims + [{"Name": "Direction", "Value": "output"}])
 
 
 def pipeline_started():
     """Mark a pipeline as started."""
-    PIPELINE_ACTIVE.inc()
+    _put_metric("PipelineStarted", 1, "Count", [])
 
 
 def pipeline_finished(status: str):
     """Mark a pipeline as finished."""
-    PIPELINE_ACTIVE.dec()
-    PIPELINE_COMPLETED.labels(status=status).inc()
+    _put_metric("PipelineCompleted", 1, "Count", [{"Name": "Status", "Value": status}])

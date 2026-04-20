@@ -13,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+import observability  # noqa: F401 — registers CloudWatch metrics
 
 from fastapi import Depends
 
@@ -65,9 +65,8 @@ def health():
 
 @app.get("/metrics", tags=["Observability"])
 def metrics():
-    """Prometheus metrics endpoint for Grafana scraping."""
-    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
-    return PlainTextResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+    """Health-style metrics endpoint — actual metrics are pushed to CloudWatch."""
+    return {"status": "ok", "metrics_target": "CloudWatch", "namespace": "ProcurementAI"}
 
 
 @app.get("/api/auth/users", tags=["Auth"])
