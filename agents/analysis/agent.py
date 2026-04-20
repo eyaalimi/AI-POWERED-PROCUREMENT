@@ -19,6 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from config import settings
 from logger import get_logger
+from observability import track_agent_call
 from agents.analysis.tools import (
     suggest_procurement_category,
     validate_budget_range,
@@ -123,6 +124,7 @@ class AnalysisAgent:
         model = BedrockModel(
             model_id=settings.bedrock_model_id,
             region_name=settings.aws_region,
+            max_tokens=4096,
         )
         self._agent = Agent(
             model=model,
@@ -191,7 +193,8 @@ When extracting the deadline:
 - If no deadline is mentioned, set deadline to null.
 """
         try:
-            response = self._agent(prompt)
+            with track_agent_call("analysis"):
+                response = self._agent(prompt)
             raw = str(response).strip()
 
             try:

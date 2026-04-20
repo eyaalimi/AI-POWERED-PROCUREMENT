@@ -1,0 +1,175 @@
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 0,
+      "width": 6,
+      "height": 6,
+      "properties": {
+        "title": "Pipelines Started (5min)",
+        "region": "us-east-1",
+        "metrics": [
+          ["ProcurementAI", "PipelineStarted", {"stat": "Sum", "period": 300}]
+        ],
+        "view": "timeSeries"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 6,
+      "y": 0,
+      "width": 6,
+      "height": 6,
+      "properties": {
+        "title": "Pipelines Completed by Status",
+        "region": "us-east-1",
+        "metrics": [
+          ["ProcurementAI", "PipelineCompleted", "Status", "completed", {"stat": "Sum", "period": 300}],
+          ["ProcurementAI", "PipelineCompleted", "Status", "failed", {"stat": "Sum", "period": 300}],
+          ["ProcurementAI", "PipelineCompleted", "Status", "rejected", {"stat": "Sum", "period": 300}],
+          ["ProcurementAI", "PipelineCompleted", "Status", "awaiting_responses", {"stat": "Sum", "period": 300}]
+        ],
+        "view": "timeSeries"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 0,
+      "width": 6,
+      "height": 6,
+      "properties": {
+        "title": "Pipeline Success Rate",
+        "region": "us-east-1",
+        "metrics": [
+          [{"expression": "100 * completed / (completed + failed)", "label": "Success Rate %", "id": "rate"}],
+          ["ProcurementAI", "PipelineCompleted", "Status", "completed", {"stat": "Sum", "period": 3600, "id": "completed", "visible": false}],
+          ["ProcurementAI", "PipelineCompleted", "Status", "failed", {"stat": "Sum", "period": 3600, "id": "failed", "visible": false}]
+        ],
+        "view": "singleValue"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "Agent Calls (rate/5min)",
+        "region": "us-east-1",
+        "metrics": [
+          ["ProcurementAI", "AgentCalls", "Agent", "orchestrator", "Status", "success", {"stat": "Sum", "period": 300}],
+          ["ProcurementAI", "AgentCalls", "Agent", "analysis", "Status", "success", {"stat": "Sum", "period": 300}],
+          ["ProcurementAI", "AgentCalls", "Agent", "sourcing", "Status", "success", {"stat": "Sum", "period": 300}],
+          ["ProcurementAI", "AgentCalls", "Agent", "communication_rfq", "Status", "success", {"stat": "Sum", "period": 300}],
+          ["ProcurementAI", "AgentCalls", "Agent", "communication_parse", "Status", "success", {"stat": "Sum", "period": 300}]
+        ],
+        "view": "timeSeries"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "Agent Errors",
+        "region": "us-east-1",
+        "metrics": [
+          ["ProcurementAI", "AgentErrors", "Agent", "orchestrator", {"stat": "Sum", "period": 300}],
+          ["ProcurementAI", "AgentErrors", "Agent", "analysis", {"stat": "Sum", "period": 300}],
+          ["ProcurementAI", "AgentErrors", "Agent", "sourcing", {"stat": "Sum", "period": 300}],
+          ["ProcurementAI", "AgentErrors", "Agent", "communication_rfq", {"stat": "Sum", "period": 300}]
+        ],
+        "view": "timeSeries"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "Agent Latency - Average (seconds)",
+        "region": "us-east-1",
+        "metrics": [
+          ["ProcurementAI", "AgentLatency", "Agent", "orchestrator", {"stat": "Average", "period": 300}],
+          ["ProcurementAI", "AgentLatency", "Agent", "analysis", {"stat": "Average", "period": 300}],
+          ["ProcurementAI", "AgentLatency", "Agent", "sourcing", {"stat": "Average", "period": 300}],
+          ["ProcurementAI", "AgentLatency", "Agent", "communication_rfq", {"stat": "Average", "period": 300}]
+        ],
+        "view": "timeSeries"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "Agent Latency - p95 (seconds)",
+        "region": "us-east-1",
+        "metrics": [
+          ["ProcurementAI", "AgentLatency", "Agent", "orchestrator", {"stat": "p95", "period": 300}],
+          ["ProcurementAI", "AgentLatency", "Agent", "analysis", {"stat": "p95", "period": 300}],
+          ["ProcurementAI", "AgentLatency", "Agent", "sourcing", {"stat": "p95", "period": 300}],
+          ["ProcurementAI", "AgentLatency", "Agent", "communication_rfq", {"stat": "p95", "period": 300}]
+        ],
+        "view": "timeSeries"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 18,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Bedrock - Input Tokens",
+        "region": "us-east-1",
+        "metrics": [
+          ["AWS/Bedrock", "InputTokenCount", "ModelId", "anthropic.claude-3-haiku-20240307-v1:0", {"stat": "Sum", "period": 3600}],
+          ["AWS/Bedrock", "InputTokenCount", "ModelId", "anthropic.claude-3-5-sonnet-20241022-v2:0", {"stat": "Sum", "period": 3600}]
+        ],
+        "view": "timeSeries"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8,
+      "y": 18,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Bedrock - Output Tokens",
+        "region": "us-east-1",
+        "metrics": [
+          ["AWS/Bedrock", "OutputTokenCount", "ModelId", "anthropic.claude-3-haiku-20240307-v1:0", {"stat": "Sum", "period": 3600}],
+          ["AWS/Bedrock", "OutputTokenCount", "ModelId", "anthropic.claude-3-5-sonnet-20241022-v2:0", {"stat": "Sum", "period": 3600}]
+        ],
+        "view": "timeSeries"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16,
+      "y": 18,
+      "width": 8,
+      "height": 6,
+      "properties": {
+        "title": "Bedrock - Invocations",
+        "region": "us-east-1",
+        "metrics": [
+          ["AWS/Bedrock", "Invocations", "ModelId", "anthropic.claude-3-haiku-20240307-v1:0", {"stat": "Sum", "period": 3600}],
+          ["AWS/Bedrock", "Invocations", "ModelId", "anthropic.claude-3-5-sonnet-20241022-v2:0", {"stat": "Sum", "period": 3600}]
+        ],
+        "view": "timeSeries"
+      }
+    }
+  ]
+}

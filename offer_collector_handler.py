@@ -31,7 +31,6 @@ EVALUATION_DEADLINE_DAYS = int(os.environ.get("EVALUATION_DEADLINE_DAYS", "5"))
 # Hours before sending a reminder to a non-responding supplier
 REMINDER_AFTER_HOURS = int(os.environ.get("REMINDER_AFTER_HOURS", "72"))
 
-from config import settings
 from logger import get_logger
 from agents.agent_storage.agent import StorageAgent
 from agents.agent_communication.agent import CommunicationAgent
@@ -236,17 +235,33 @@ def _process_pending_request(req: dict) -> dict:
         logger.error("Evaluation failed", extra={"error": str(exc)})
         eval_result = None
 
+    # ── Store evaluation scores to DB ─────────────────────────────────────
+    if eval_result and eval_result.scores:
+        try:
+            score_dicts = [
+                asdict(s) if hasattr(s, "__dataclass_fields__") else s
+                for s in eval_result.scores
+            ]
+            _storage._tools.store_evaluations(
+                request_id, score_dicts, getattr(eval_result, "report_path", None)
+            )
+            logger.info("Evaluations stored to DB", extra={
+                "request_id": request_id, "count": len(score_dicts),
+            })
+        except Exception as exc:
+            logger.warning("Failed to store evaluations", extra={"error": str(exc)})
+
     # ── Send evaluation report to requester ───────────────────────────────
     if eval_result and requester_email:
         try:
-            _send_evaluation_report(requester_email, product, eval_result, len(all_offers))
+            _send_evaluation_report(requester_email, product, eval_result, len(all_offers), request_id=request_id)
         except Exception as exc:
             logger.warning("Failed to send evaluation report", extra={"error": str(exc)})
 
     # ── Mark request completed ────────────────────────────────────────────
     try:
-        _storage._tools.update_request_status(request_id, "completed")
-        logger.info("Request marked completed", extra={"request_id": request_id})
+        _storage._tools.update_request_status(request_id, "evaluation_sent")
+        logger.info("Request marked evaluation_sent", extra={"request_id": request_id})
     except Exception as exc:
         logger.warning("Failed to update status", extra={"error": str(exc)})
 
@@ -316,10 +331,13 @@ def _send_reminders_if_needed(sent_rfqs: list, suppliers_in_db: list, product: s
             logger.warning("Failed to send reminder", extra={"error": str(exc), "supplier": supplier_email})
 
 
-def _send_evaluation_report(requester_email: str, product: str, eval_result, total_offers: int) -> None:
+def _send_evaluation_report(requester_email: str, product: str, eval_result, total_offers: int, request_id: str = None) -> None:
     """Email the final evaluation summary to the requester."""
     if not eval_result.scores:
         return
+
+    dashboard_url = os.environ.get("DASHBOARD_URL", "https://procurement-ai.click")
+    select_link = f"{dashboard_url}/select/{request_id}" if request_id else ""
 
     lines = [
         "Bonjour,",
@@ -328,15 +346,26 @@ def _send_evaluation_report(requester_email: str, product: str, eval_result, tot
         f"Nombre total d'offres reçues : {total_offers}",
         "",
         f"Meilleur fournisseur : {eval_result.best_offer}",
-        "",
-        "Classement des offres :",
     ]
+
+    if select_link:
+        lines += [
+            "",
+            "📊 Voir le rapport et sélectionner un fournisseur :",
+            select_link,
+        ]
+
+    lines += ["", "Classement des offres :"]
     for s in eval_result.scores:
         score_val = getattr(s, "overall_score", None) or getattr(s, "performance_score", None)
         score_str = f"{score_val:.1f}/10" if score_val is not None else "N/A"
         lines.append(f"  #{s.rank}. {s.supplier_name} — Score: {score_str}")
 
     lines += [
+        "",
+        "Vous pouvez :",
+        "• Cliquer sur le lien ci-dessus pour comparer les offres et passer commande",
+        "• Répondre \"RELAUNCH\" à cet email pour relancer une nouvelle recherche",
         "",
         "Cordialement,",
         "Procurement AI System",

@@ -92,6 +92,19 @@ def analyze_request(email_body: str, requester_email: str, attachment_text: str 
     logger.info("Tool: analyze_request called", extra={"requester": requester_email})
     agent = _get_analysis_agent()
     result = agent.analyze(email_body, requester_email, attachment_text=attachment_text)
+
+    # ── Send ACK with the real product name (extracted by analysis) ───
+    try:
+        from agents.analysis.tools import send_request_acknowledgment
+        send_request_acknowledgment(
+            requester_email=result.requester_email or requester_email,
+            is_valid=result.is_valid,
+            product=result.product,
+        )
+        logger.info("ACK sent", extra={"to": requester_email, "product": result.product})
+    except Exception as exc:
+        logger.warning("ACK email failed (non-blocking)", extra={"error": str(exc)})
+
     return _to_json(result)
 
 

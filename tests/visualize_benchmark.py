@@ -22,7 +22,6 @@ from agents.agent_evaluation.agent import (
     _score_budget_fit,
     _parse_payment_days,
     _score_rse,
-    QCDP_WEIGHTS,
 )
 from agents.agent_storage.agent import StorageAgent
 
@@ -572,9 +571,12 @@ def _ai_metrics_section() -> str:
     o_sum = offer.get("summary", {})
 
     def _bc(val):
-        if val >= 0.9: return "#4CAF50"
-        elif val >= 0.7: return "#8BC34A"
-        elif val >= 0.5: return "#FF9800"
+        if val >= 0.9:
+            return "#4CAF50"
+        elif val >= 0.7:
+            return "#8BC34A"
+        elif val >= 0.5:
+            return "#FF9800"
         return "#F44336"
 
     def _pc(val):

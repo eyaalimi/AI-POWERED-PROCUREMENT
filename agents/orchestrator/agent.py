@@ -30,6 +30,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from config import settings
 from logger import get_logger
+from observability import track_agent_call, pipeline_started, pipeline_finished
 from agents.orchestrator.tools import (
     analyze_request,
     source_suppliers,
@@ -131,6 +132,7 @@ class Orchestrator:
             model = BedrockModel(
                 model_id=settings.bedrock_model_id,
                 region_name=settings.aws_region,
+                max_tokens=4096,
             )
         self._agent = Agent(
             model=model,
@@ -208,13 +210,16 @@ Execute the full procurement pipeline using the available tools.
 When calling analyze_request, pass the attachment_text parameter if attachment content is provided above.
 """
 
+        pipeline_started()
         try:
-            response = self._agent(prompt)
+            with track_agent_call("orchestrator"):
+                response = self._agent(prompt)
             raw = str(response).strip()
 
             # Parse the final JSON summary from the LLM
             result_data = self._parse_result(raw)
 
+            pipeline_finished(result_data.get("status", "completed"))
             return PipelineResult(
                 request_id=result_data.get("request_id"),
                 product=result_data.get("product", ""),
@@ -229,6 +234,7 @@ When calling analyze_request, pass the attachment_text parameter if attachment c
             )
 
         except Exception as exc:
+            pipeline_finished("failed")
             logger.error("Orchestrator pipeline failed", extra={"error": str(exc)})
             return PipelineResult(
                 request_id=None,

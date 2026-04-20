@@ -1,0 +1,91 @@
+{
+  "dashboard": {
+    "title": "Procurement AI — Agent Observability",
+    "tags": ["procurement", "ai", "agents"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "panels": [
+      {
+        "title": "Active Pipelines",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+        "targets": [
+          { "expr": "pipeline_active_count", "legendFormat": "Active" }
+        ],
+        "fieldConfig": {
+          "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [{ "value": 0, "color": "green" }, { "value": 3, "color": "yellow" }, { "value": 5, "color": "red" }] } }
+        }
+      },
+      {
+        "title": "Pipelines Completed (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+        "targets": [
+          { "expr": "increase(pipeline_completed_total[24h])", "legendFormat": "{{ status }}" }
+        ]
+      },
+      {
+        "title": "Agent Calls (rate/min)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+        "targets": [
+          { "expr": "rate(agent_calls_total[5m]) * 60", "legendFormat": "{{ agent }} ({{ status }})" }
+        ]
+      },
+      {
+        "title": "Agent Latency (p95)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+        "targets": [
+          { "expr": "histogram_quantile(0.95, rate(agent_latency_seconds_bucket[5m]))", "legendFormat": "{{ agent }} p95" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "s" } }
+      },
+      {
+        "title": "Agent Latency (avg)",
+        "type": "bargauge",
+        "gridPos": { "h": 6, "w": 12, "x": 0, "y": 12 },
+        "targets": [
+          { "expr": "rate(agent_latency_seconds_sum[5m]) / rate(agent_latency_seconds_count[5m])", "legendFormat": "{{ agent }}" }
+        ],
+        "fieldConfig": { "defaults": { "unit": "s" } }
+      },
+      {
+        "title": "Error Rate by Agent",
+        "type": "timeseries",
+        "gridPos": { "h": 6, "w": 12, "x": 12, "y": 12 },
+        "targets": [
+          { "expr": "rate(agent_errors_total[5m]) * 60", "legendFormat": "{{ agent }} — {{ error_type }}" }
+        ],
+        "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } } }
+      },
+      {
+        "title": "Token Usage (rate/min)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 18 },
+        "targets": [
+          { "expr": "rate(agent_tokens_total[5m]) * 60", "legendFormat": "{{ agent }} {{ direction }}" }
+        ]
+      },
+      {
+        "title": "Pipeline Status Distribution (24h)",
+        "type": "piechart",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 18 },
+        "targets": [
+          { "expr": "increase(pipeline_completed_total[24h])", "legendFormat": "{{ status }}" }
+        ]
+      },
+      {
+        "title": "Agent Success Rate (%)",
+        "type": "gauge",
+        "gridPos": { "h": 6, "w": 24, "x": 0, "y": 26 },
+        "targets": [
+          { "expr": "rate(agent_calls_total{status='success'}[1h]) / rate(agent_calls_total[1h]) * 100", "legendFormat": "{{ agent }}" }
+        ],
+        "fieldConfig": {
+          "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "steps": [{ "value": 0, "color": "red" }, { "value": 90, "color": "yellow" }, { "value": 98, "color": "green" }] } }
+        }
+      }
+    ]
+  }
+}

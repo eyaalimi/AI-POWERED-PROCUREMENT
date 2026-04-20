@@ -300,7 +300,7 @@ class TestReportGeneration:
         content = report_path.read_text()
         assert "SupplierA" in content
         assert "SupplierB" in content
-        assert "SUPPLIER EVALUATION REPORT" in content
+        assert "RAPPORT D'ÉVALUATION DES FOURNISSEURS" in content
 
 
 if __name__ == "__main__":

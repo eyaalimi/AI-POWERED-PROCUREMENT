@@ -39,7 +39,7 @@ Update `.env` with your credentials:
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
-BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-4-20250514-v1:0
+BEDROCK_MODEL_ID=arn:aws:bedrock:us-east-1:415529767461:inference-profile/global.amazon.nova-2-lite-v1:0
 
 # Gmail Configuration
 GMAIL_ADDRESS=your-email@gmail.com
