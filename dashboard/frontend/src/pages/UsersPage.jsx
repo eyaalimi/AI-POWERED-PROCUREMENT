@@ -130,9 +130,9 @@ export default function UsersPage() {
 
       <div style={{
         background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0',
-        overflow: 'hidden',
+        overflow: 'auto',
       }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 880 }}>
           <thead>
             <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
               <th style={thStyle}>Name</th>

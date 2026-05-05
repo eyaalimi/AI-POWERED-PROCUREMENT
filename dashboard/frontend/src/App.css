@@ -254,10 +254,14 @@ body {
 /* === Page Content === */
 .page-content {
   flex: 1;
-  padding: 28px;
-  padding-top: calc(var(--navbar-height) + 28px);
+  padding: 0;
+  padding-top: var(--navbar-height);
   min-width: 0;
   overflow-x: hidden;
+}
+
+.page {
+  padding: 24px 32px;
 }
 
 .page h1 {
@@ -1014,7 +1018,8 @@ body {
   .sidebar-header { padding: 16px 12px; }
   .nav-link { justify-content: center; padding: 12px; border-left: none; }
   .main-content { margin-left: 64px; }
-  .page-content { padding: 16px; padding-top: calc(var(--navbar-height) + 16px); }
+  .page-content { padding: 0; padding-top: var(--navbar-height); }
+  .page { padding: 16px; }
   .top-header { padding: 0 16px; left: 64px; }
   .kpi-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
 }
