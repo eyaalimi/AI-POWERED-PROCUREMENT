@@ -1,0 +1,21 @@
+# Prometheus configuration for Procurement AI
+# Scrapes the /metrics endpoint exposed by the Dashboard API
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "procurement-ai-dashboard"
+    metrics_path: /metrics
+    static_targets:
+      - targets: ["localhost:8000"]
+    # For production (Lambda behind API Gateway), use:
+    # scheme: https
+    # static_configs:
+    #   - targets: ["<your-api-gateway-url>"]
+
+  # If running locally with docker-compose:
+  # - job_name: "procurement-ai-local"
+  #   static_targets:
+  #     - targets: ["host.docker.internal:8000"]

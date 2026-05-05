@@ -34,7 +34,6 @@ os.environ.setdefault("OUTPUTS_DIR", "/tmp/outputs")
 from config import settings
 from logger import get_logger
 from email_gateway.parser import EmailParser
-from agents.analysis.agent import send_request_acknowledgment
 from agents.orchestrator.agent import Orchestrator
 
 logger = get_logger(__name__)
@@ -156,17 +155,6 @@ def _process_email(raw_bytes: bytes, source_key: str = "") -> dict:
         "Email parsed",
         extra={"from": parsed.from_email, "subject": parsed.subject},
     )
-
-    # ── Send ACK email immediately (before pipeline runs) ──────────────
-    try:
-        send_request_acknowledgment(
-            requester_email=parsed.from_email,
-            is_valid=True,  # Optimistic ACK — analysis happens in pipeline
-            product=parsed.subject,
-        )
-        logger.info("ACK sent", extra={"to": parsed.from_email})
-    except Exception as exc:
-        logger.warning("ACK email failed (non-blocking)", extra={"error": str(exc)})
 
     # ── Run full Orchestrator pipeline ─────────────────────────────────
     try:

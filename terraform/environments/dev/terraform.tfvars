@@ -4,10 +4,14 @@
 
 aws_region           = "us-east-1"
 image_tag            = "latest"
-bedrock_model_id     = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+bedrock_model_id     = "arn:aws:bedrock:us-east-1:415529767461:inference-profile/global.amazon.nova-2-lite-v1:0"
 ses_recipient_emails = []    # e.g. ["dev-procurement@yourdomain.com"]
 
 # ── Credentials (set via TF_VAR_* env vars) ───────────────────────────────
 gmail_address        = ""
 gmail_app_password   = ""
 tavily_api_key       = ""
+jwt_secret           = ""
+
+# ── Dashboard ─────────────────────────────────────────────────────────────
+domain_name = "procurement-ai.click"

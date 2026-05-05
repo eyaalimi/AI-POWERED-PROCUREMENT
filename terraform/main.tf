@@ -300,6 +300,9 @@ resource "aws_lambda_function" "offer_collector" {
       DATABASE_URL              = "postgresql://${aws_db_instance.postgres.username}:${urlencode(random_password.db_password.result)}@${aws_db_instance.postgres.address}:${aws_db_instance.postgres.port}/${aws_db_instance.postgres.db_name}"
       EVALUATION_DEADLINE_DAYS  = "5"
       REMINDER_AFTER_HOURS      = "72"
+      SECRETS_GMAIL_ARN         = aws_secretsmanager_secret.gmail_credentials.arn
+      SECRETS_TAVILY_ARN        = aws_secretsmanager_secret.tavily_api_key.arn
+      SECRETS_DB_ARN            = aws_secretsmanager_secret.db_credentials.arn
     }
   }
 

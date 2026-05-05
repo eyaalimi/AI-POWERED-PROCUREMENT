@@ -13,11 +13,9 @@ Agents tested:
   5. Evaluation Agent  — deterministic QCDP scoring (no external deps)
 """
 import json
-import math
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
-from dataclasses import asdict
+from unittest.mock import MagicMock
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # GROUND-TRUTH DATASETS
@@ -718,7 +716,7 @@ class TestOfferParsingAccuracy:
         ids=[tc["id"] for tc in OFFER_PARSING_GROUND_TRUTH if "is_auto_reply" not in tc["expected"]],
     )
     def test_offer_extraction(self, test_case):
-        from agents.agent_communication.agent import CommunicationAgent, _parse_llm_json
+        from agents.agent_communication.agent import _parse_llm_json
         from strands import Agent
         from strands.models import BedrockModel
         from config import settings

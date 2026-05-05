@@ -38,7 +38,9 @@ module "procurement_agent" {
   gmail_address        = var.gmail_address
   gmail_app_password   = var.gmail_app_password
   tavily_api_key       = var.tavily_api_key
+  jwt_secret           = var.jwt_secret
   log_level            = "DEBUG"
+  domain_name          = var.domain_name
 
   # RDS — dev settings (cheaper, no protection)
   rds_instance_class      = "db.t3.micro"
@@ -69,7 +71,7 @@ variable "image_tag" {
 variable "bedrock_model_id" {
   description = "AWS Bedrock model ID"
   type        = string
-  default     = "us.anthropic.claude-sonnet-4-20250514-v1:0"
+  default     = "arn:aws:bedrock:us-east-1:415529767461:inference-profile/global.amazon.nova-2-lite-v1:0"
 }
 
 variable "ses_recipient_emails" {
@@ -99,6 +101,19 @@ variable "tavily_api_key" {
   default     = ""
 }
 
+variable "jwt_secret" {
+  description = "Secret key for JWT token signing"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "domain_name" {
+  description = "Root domain for the dashboard"
+  type        = string
+  default     = "procurement-ai.click"
+}
+
 # ── Pass-through outputs ───────────────────────────────────────────────────────
 output "ecr_repository_url" {
   description = "ECR repository URL"
@@ -123,4 +138,14 @@ output "cloudwatch_log_group" {
 output "rds_endpoint" {
   description = "RDS endpoint"
   value       = module.procurement_agent.rds_endpoint
+}
+
+output "frontend_url" {
+  description = "Dashboard URL"
+  value       = module.procurement_agent.frontend_url
+}
+
+output "api_url" {
+  description = "Dashboard API URL"
+  value       = module.procurement_agent.api_url
 }

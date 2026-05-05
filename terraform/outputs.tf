@@ -61,6 +61,33 @@ output "vpc_id" {
   value       = aws_vpc.main.id
 }
 
+# ── Dashboard ────────────────────────────────────────────────────────────────
+
+output "frontend_url" {
+  description = "Dashboard frontend URL"
+  value       = "https://${var.domain_name}"
+}
+
+output "api_url" {
+  description = "Dashboard API URL"
+  value       = "https://api.${var.domain_name}"
+}
+
+output "frontend_s3_bucket" {
+  description = "S3 bucket for frontend static files"
+  value       = aws_s3_bucket.frontend.bucket
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID (for cache invalidation)"
+  value       = aws_cloudfront_distribution.frontend.id
+}
+
+output "dashboard_ecr_repository_url" {
+  description = "ECR repository URL for dashboard API image"
+  value       = aws_ecr_repository.dashboard.repository_url
+}
+
 # ── Push commands ────────────────────────────────────────────────────────────
 
 output "push_image_commands" {

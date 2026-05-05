@@ -1,0 +1,145 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { Zap, Mail, Lock, AlertCircle, User, Building2 } from 'lucide-react';
+
+export default function LoginPage() {
+  const { login, register } = useAuth();
+  const navigate = useNavigate();
+  const [mode, setMode] = useState('login'); // login | register
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      if (mode === 'login') {
+        await login(email, password);
+      } else {
+        await register(name, email, password, companyName);
+      }
+      navigate('/');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-page">
+      <div style={{ width: '100%', maxWidth: 460, position: 'relative', zIndex: 1 }}>
+        <div className="auth-card">
+          <div className="auth-header">
+            <div className="auth-logo">
+              <Zap size={28} />
+            </div>
+            <h1>Procurement AI</h1>
+            <p>{mode === 'login' ? 'Sign in to your account' : 'Create your account'}</p>
+          </div>
+          <div className="auth-separator" />
+
+          {error && (
+            <div className="auth-error">
+              <AlertCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="auth-form">
+            {mode === 'register' && (
+              <>
+                <div className="auth-field">
+                  <label>Full Name</label>
+                  <div className="auth-input-wrapper">
+                    <User size={16} />
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      placeholder="Your full name"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="auth-field">
+                  <label>Company Name</label>
+                  <div className="auth-input-wrapper">
+                    <Building2 size={16} />
+                    <input
+                      type="text"
+                      value={companyName}
+                      onChange={e => setCompanyName(e.target.value)}
+                      placeholder="Your company"
+                      required
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="auth-field">
+              <label>Email</label>
+              <div className="auth-input-wrapper">
+                <Mail size={16} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="auth-field">
+              <label>Password</label>
+              <div className="auth-input-wrapper">
+                <Lock size={16} />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder={mode === 'login' ? 'Enter your password' : 'Choose a password'}
+                  required
+                />
+              </div>
+            </div>
+
+            <button type="submit" className="auth-btn" disabled={loading}>
+              {loading
+                ? (mode === 'login' ? 'Signing in...' : 'Creating account...')
+                : (mode === 'login' ? 'Sign In' : 'Create Account')
+              }
+            </button>
+          </form>
+
+          <div className="auth-footer">
+            {mode === 'login' ? (
+              <>Don&apos;t have an account? <button className="auth-switch-btn" onClick={() => { setMode('register'); setError(''); }}>Register</button></>
+            ) : (
+              <>Already have an account? <button className="auth-switch-btn" onClick={() => { setMode('login'); setError(''); }}>Sign In</button></>
+            )}
+          </div>
+        </div>
+
+        <div className="auth-system-info">
+          <div className="auth-sys-badge"><div className="auth-sys-dot" />5 AI Agents</div>
+          <div className="auth-sys-badge"><div className="auth-sys-dot" />PostgreSQL</div>
+          <div className="auth-sys-badge"><div className="auth-sys-dot" />AWS Bedrock</div>
+        </div>
+
+        <div className="auth-brand-footer">
+          Procurement AI &bull; Intelligent Procurement System &bull; Confidential
+        </div>
+      </div>
+    </div>
+  );
+}

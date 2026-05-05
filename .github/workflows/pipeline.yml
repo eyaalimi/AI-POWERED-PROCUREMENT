@@ -1,0 +1,430 @@
+# =============================================================================
+#  Procurement AI — Unified CI/CD Pipeline
+#
+#  Visualized as a clear pipeline in GitHub Actions:
+#
+#  ┌──────────┐   ┌──────────┐   ┌───────────────┐   ┌──────────────────┐
+#  │   Lint   │──▶│  Tests   │──▶│  Build Agent  │──▶│  Deploy Lambdas  │
+#  └──────────┘   └──────────┘   │  Build Dash   │   │  Deploy Dashboard│
+#                                │  Build Front  │   │  Deploy Frontend │
+#                                └───────────────┘   └──────────────────┘
+#
+#  CI runs on all pushes & PRs. CD only runs on main after CI passes.
+#
+#  DevSecOps gates: SAST, SCA, Secrets, Container Scan, Smoke Test
+# =============================================================================
+
+name: "CI/CD Pipeline"
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 415529767461.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPO_AGENT: procurement-agent-prod
+  ECR_REPO_DASHBOARD: procurement-agent-prod-dashboard
+  LAMBDA_AGENT: procurement-agent-prod-analysis-agent
+  LAMBDA_COLLECTOR: procurement-agent-prod-analysis-agent-offer-collector
+  LAMBDA_DASHBOARD: procurement-agent-prod-dashboard
+  FRONTEND_BUCKET: procurement-agent-prod-frontend-415529767461
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  CI JOBS
+# ─────────────────────────────────────────────────────────────────────────────
+
+jobs:
+
+  # ── 1. Lint ────────────────────────────────────────────────────────────────
+  lint:
+    name: "CI · Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Ruff lint check
+        run: ruff check .
+
+  # ── 2. Unit Tests ─────────────────────────────────────────────────────────
+  test:
+    name: "CI · Tests"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run unit tests
+        run: |
+          python -m pytest \
+            tests/test_sanitizer.py \
+            tests/test_agent_storage.py \
+            tests/test_agent_evaluation.py \
+            tests/test_prompt_regression.py \
+            -v --tb=short
+
+  # ── 3. Frontend build check ───────────────────────────────────────────────
+  frontend-check:
+    name: "CI · Frontend Build"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install & build frontend
+        run: |
+          cd dashboard/frontend
+          npm ci
+          VITE_API_BASE=https://placeholder.example.com/api npm run build
+
+  # ── 2b. Security — SAST (Bandit) ──────────────────────────────────────────
+  sast:
+    name: "Security · SAST"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run Bandit
+        run: |
+          pip install bandit
+          bandit -r agents/ dashboard/api/ -ll -ii -s B108 --format json -o bandit-report.json || true
+          bandit -r agents/ dashboard/api/ -ll -ii -s B108
+
+      - name: Upload SAST report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+
+  # ── 2c. Security — SCA (Dependency Vulnerabilities) ─────────────────────
+  dependency-scan:
+    name: "Security · SCA"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: pip-audit (Python)
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt --desc on
+
+      - name: npm audit (Frontend)
+        run: |
+          cd dashboard/frontend
+          npm ci
+          npm audit --audit-level=high || true
+
+  # ── 2d. Security — Secrets Detection ────────────────────────────────────
+  secrets-scan:
+    name: "Security · Secrets"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified --results=verified
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  CD JOBS — only on push to main
+# ─────────────────────────────────────────────────────────────────────────────
+
+  # ── 4. Build & push Agent image ───────────────────────────────────────────
+  build-agent:
+    name: "CD · Build Agent Image"
+    runs-on: ubuntu-latest
+    needs: [test, frontend-check, sast, dependency-scan, secrets-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      image_uri: ${{ steps.build.outputs.image_uri }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag & push
+        id: build
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          IMAGE_URI=$ECR_REGISTRY/$ECR_REPO_AGENT:$IMAGE_TAG
+
+          docker build -t $IMAGE_URI .
+          docker push $IMAGE_URI
+
+          docker tag $IMAGE_URI $ECR_REGISTRY/$ECR_REPO_AGENT:latest
+          docker push $ECR_REGISTRY/$ECR_REPO_AGENT:latest
+
+          echo "image_uri=$IMAGE_URI" >> $GITHUB_OUTPUT
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.build.outputs.image_uri }}
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          format: 'table'
+          trivyignores: '.trivyignore'
+
+  # ── 5. Build & push Dashboard API image ──────────────────────────────────
+  build-dashboard:
+    name: "CD · Build Dashboard Image"
+    runs-on: ubuntu-latest
+    needs: [test, frontend-check, sast, dependency-scan, secrets-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag & push
+        run: |
+          docker build --platform linux/amd64 -f Dockerfile.dashboard -t dashboard-api .
+          docker tag dashboard-api:latest $ECR_REGISTRY/$ECR_REPO_DASHBOARD:latest
+          docker push $ECR_REGISTRY/$ECR_REPO_DASHBOARD:latest
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO_DASHBOARD }}:latest
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          format: 'table'
+          trivyignores: '.trivyignore'
+
+  # ── 6. Deploy Agent Lambdas ──────────────────────────────────────────────
+  deploy-agent:
+    name: "CD · Deploy Agent Lambdas"
+    runs-on: ubuntu-latest
+    needs: build-agent
+
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update analysis-agent Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name $LAMBDA_AGENT \
+            --image-uri ${{ needs.build-agent.outputs.image_uri }} \
+            --region $AWS_REGION
+
+      - name: Update offer-collector Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name $LAMBDA_COLLECTOR \
+            --image-uri ${{ needs.build-agent.outputs.image_uri }} \
+            --region $AWS_REGION
+
+      - name: Wait for Lambda updates
+        run: |
+          aws lambda wait function-updated --function-name $LAMBDA_AGENT --region $AWS_REGION
+          aws lambda wait function-updated --function-name $LAMBDA_COLLECTOR --region $AWS_REGION
+
+  # ── 7. Deploy Dashboard API Lambda ──────────────────────────────────────
+  deploy-dashboard:
+    name: "CD · Deploy Dashboard API"
+    runs-on: ubuntu-latest
+    needs: build-dashboard
+
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update Dashboard Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name $LAMBDA_DASHBOARD \
+            --image-uri $ECR_REGISTRY/$ECR_REPO_DASHBOARD:latest \
+            --region $AWS_REGION
+          aws lambda wait function-updated \
+            --function-name $LAMBDA_DASHBOARD \
+            --region $AWS_REGION
+
+  # ── 8. Deploy Frontend to S3 + CloudFront ───────────────────────────────
+  deploy-frontend:
+    name: "CD · Deploy Frontend"
+    runs-on: ubuntu-latest
+    needs: [deploy-dashboard]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Resolve API URL
+        id: api-url
+        run: |
+          API_URL=$(aws apigatewayv2 get-apis --region $AWS_REGION \
+            --query "Items[?Name=='procurement-agent-prod-dashboard-api'].ApiEndpoint" \
+            --output text)
+          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
+
+      - name: Build frontend
+        run: |
+          cd dashboard/frontend
+          npm ci
+          VITE_API_BASE=${{ steps.api-url.outputs.api_url }}/api npm run build
+
+      - name: Upload to S3
+        run: |
+          aws s3 sync dashboard/frontend/dist/ s3://$FRONTEND_BUCKET/ \
+            --delete --cache-control "public, max-age=31536000"
+          aws s3 cp dashboard/frontend/dist/index.html s3://$FRONTEND_BUCKET/index.html \
+            --cache-control "public, max-age=60"
+
+      - name: Invalidate CloudFront
+        run: |
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Aliases.Items, 'procurement-ai.click')].Id" \
+            --output text)
+          if [ -n "$DIST_ID" ]; then
+            aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths "/*" > /dev/null
+            echo "CloudFront invalidation created for $DIST_ID"
+          fi
+
+  # ── 9. Smoke Test ────────────────────────────────────────────────────────
+  smoke-test:
+    name: "CD · Smoke Test"
+    runs-on: ubuntu-latest
+    needs: [deploy-agent, deploy-dashboard, deploy-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Wait for propagation
+        run: sleep 15
+
+      - name: Frontend health check
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://procurement-ai.click/)
+          echo "Frontend returned HTTP $HTTP_CODE"
+          [ "$HTTP_CODE" -eq 200 ] || exit 1
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: API health check
+        run: |
+          API_URL=$(aws apigatewayv2 get-apis --region $AWS_REGION \
+            --query "Items[?Name=='procurement-agent-prod-dashboard-api'].ApiEndpoint" \
+            --output text)
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/api/health")
+          echo "API returned HTTP $HTTP_CODE"
+          [ "$HTTP_CODE" -eq 200 ] || exit 1
+
+  # ── 10. Summary ─────────────────────────────────────────────────────────
+  summary:
+    name: "Pipeline Summary"
+    runs-on: ubuntu-latest
+    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [lint, test, frontend-check, sast, dependency-scan, secrets-scan, deploy-agent, deploy-dashboard, deploy-frontend, smoke-test]
+
+    steps:
+      - name: Pipeline result
+        run: |
+          echo "## Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Tests | ${{ needs.test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Build | ${{ needs.frontend-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy Agent | ${{ needs.deploy-agent.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy Dashboard | ${{ needs.deploy-dashboard.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy Frontend | ${{ needs.deploy-frontend.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SAST (Bandit) | ${{ needs.sast.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SCA (pip-audit) | ${{ needs.dependency-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secrets Scan | ${{ needs.secrets-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Test | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Author:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY

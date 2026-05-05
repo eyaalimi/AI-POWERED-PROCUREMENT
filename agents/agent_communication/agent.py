@@ -25,6 +25,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from config import settings
 from logger import get_logger
+from observability import track_agent_call
 from agents.agent_communication.tools import (
     send_email_to_supplier,
     retry_find_supplier_email,
@@ -261,6 +262,7 @@ class CommunicationAgent:
         model = BedrockModel(
             model_id=settings.bedrock_model_id,
             region_name=settings.aws_region,
+            max_tokens=4096,
         )
         # Separate agent instances for each phase (different system prompts)
         self._rfq_agent = Agent(
@@ -327,7 +329,8 @@ Process each supplier: recover missing emails if needed, write the RFQ, and send
 """
 
         try:
-            response = self._rfq_agent(prompt)
+            with track_agent_call("communication_rfq"):
+                response = self._rfq_agent(prompt)
             data = _parse_llm_json(str(response))
         except Exception as exc:
             logger.error("RFQ phase failed", extra={"error": str(exc)})
@@ -413,7 +416,8 @@ Fetch replies and parse any supplier offers found.
 """
 
         try:
-            response = self._parse_agent(prompt)
+            with track_agent_call("communication_parse"):
+                response = self._parse_agent(prompt)
             data = _parse_llm_json(str(response))
         except Exception as exc:
             logger.error("Response check failed", extra={"error": str(exc)})
@@ -506,7 +510,8 @@ Write a polite follow-up in French and send each reminder.
 """
 
         try:
-            response = self._reminder_agent(prompt)
+            with track_agent_call("communication_reminder"):
+                response = self._reminder_agent(prompt)
             data = _parse_llm_json(str(response))
         except Exception as exc:
             logger.error("Reminder phase failed", extra={"error": str(exc)})
