@@ -103,6 +103,30 @@ def create_user(body: CreateUserRequest, db: Session = Depends(get_db), admin: U
     return user_to_dict(user, company.name if company else "")
 
 
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_user),
+):
+    if admin.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    if str(admin.id) == str(user_id):
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+
+    target = db.query(User).filter_by(id=user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if str(target.company_id) != str(admin.company_id):
+        raise HTTPException(status_code=403, detail="Cannot delete users from another company")
+
+    db.delete(target)
+    db.commit()
+    return {"status": "deleted", "id": str(user_id)}
+
+
 @router.post("/register")
 def register(body: RegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(User).filter_by(email=body.email.lower().strip()).first()

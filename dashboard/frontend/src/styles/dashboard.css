@@ -966,11 +966,20 @@
 }
 
 /* ============================================================
-   Top header chrome alignment (when dashboard is mounted)
+   Full-bleed dashboard chrome (when dashboard is mounted)
    ============================================================ */
+body:has(.dash) {
+  background: var(--dash-bg-base);
+}
+
+body:has(.dash) .main-content {
+  background: var(--dash-bg-base);
+}
+
 body:has(.dash) .top-header {
   background: var(--dash-bg-base);
   border-bottom: 1px solid var(--dash-border-subtle);
+  box-shadow: none;
 }
 
 body:has(.dash) .top-header h1 {
@@ -984,4 +993,5 @@ body:has(.dash) .live-dot {
 
 body:has(.dash) .page-content {
   padding: 0;
+  padding-top: var(--navbar-height);
 }

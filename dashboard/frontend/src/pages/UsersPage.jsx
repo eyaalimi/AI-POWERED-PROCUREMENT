@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useApi, apiPost } from '../hooks/useApi';
-import { Users, Shield, User, UserPlus, X } from 'lucide-react';
+import { useApi, apiPost, apiDelete } from '../hooks/useApi';
+import { useAuth } from '../context/AuthContext';
+import { Users, Shield, User, UserPlus, X, Trash2 } from 'lucide-react';
 
 const ROLE_STYLES = {
   admin: { bg: '#fef3c7', color: '#92400e', icon: Shield },
@@ -8,11 +9,31 @@ const ROLE_STYLES = {
 };
 
 export default function UsersPage() {
+  const { user: currentUser } = useAuth();
   const { data: users, loading, error, refetch } = useApi('/auth/users');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', password: '', department: '', role: 'employee' });
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const handleDelete = async (userId) => {
+    setDeletingId(userId);
+    try {
+      const res = await apiDelete(`/auth/users/${userId}`);
+      if (res.status === 'deleted') {
+        refetch();
+        setConfirmDelete(null);
+      } else {
+        alert(res.detail || 'Failed to delete user');
+      }
+    } catch {
+      alert('Failed to delete user');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -119,6 +140,7 @@ export default function UsersPage() {
               <th style={thStyle}>Department</th>
               <th style={thStyle}>Role</th>
               <th style={thStyle}>Joined</th>
+              <th style={{ ...thStyle, width: 120, textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -154,12 +176,87 @@ export default function UsersPage() {
                   <td style={{ padding: '12px 16px', color: '#64748b' }}>
                     {u.created_at ? new Date(u.created_at).toLocaleDateString() : '-'}
                   </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                    {currentUser?.id !== u.id && (
+                      <button
+                        onClick={() => setConfirmDelete(u)}
+                        title="Delete user"
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          background: '#fef2f2', color: '#dc2626',
+                          border: '1px solid #fecaca', borderRadius: 8,
+                          padding: '6px 12px', fontSize: 12, fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Trash2 size={13} />
+                        Delete
+                      </button>
+                    )}
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {confirmDelete && (
+        <div
+          onClick={() => setConfirmDelete(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: 12, padding: 24,
+              width: 420, boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%',
+                background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Trash2 size={18} color="#dc2626" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>Delete user?</h3>
+            </div>
+            <p style={{ margin: '0 0 18px', fontSize: 14, color: '#475569', lineHeight: 1.5 }}>
+              You are about to permanently delete <strong>{confirmDelete.name}</strong> ({confirmDelete.email}).
+              This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setConfirmDelete(null)}
+                disabled={deletingId === confirmDelete.id}
+                style={{
+                  background: '#fff', color: '#475569', border: '1px solid #e2e8f0',
+                  borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(confirmDelete.id)}
+                disabled={deletingId === confirmDelete.id}
+                style={{
+                  background: '#dc2626', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {deletingId === confirmDelete.id ? 'Deleting...' : 'Delete user'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
